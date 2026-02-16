@@ -8,11 +8,9 @@ const App = () => {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={{ flex: 1 }}>
         <NavigationContainer>
           <AppNavigator/>
         </NavigationContainer>
-      </SafeAreaView>
     </SafeAreaProvider>
   );
 };
