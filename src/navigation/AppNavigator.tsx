@@ -4,6 +4,7 @@ import  Login  from "../screens/authentication/LoginScreen";
 import Signup  from "../screens/authentication/SignupScreen";
 import  ForgotPassword  from "../screens/authentication/ForgetPasswordScreen";
 import Dashboard from '../screens/main/Dashboard';
+import ProfileSettings from '../screens/profile/ProfileSettings';
 
 const Stack = createNativeStackNavigator();
 
@@ -28,6 +29,10 @@ const AppNavigator = () => {
             <Stack.Screen
                 name="Dashboard"
                 component={Dashboard}
+            />
+            <Stack.Screen
+                name="Profile"
+                component={ProfileSettings}
             />
         </Stack.Navigator>
     );
