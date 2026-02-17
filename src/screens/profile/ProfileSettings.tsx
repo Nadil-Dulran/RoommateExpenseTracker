@@ -25,10 +25,10 @@ const currencies = [
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
 
-  const [name, setName] = useState('John Doe');
+  const [name, setName] = useState('Enter your name');
   const [email, setEmail] = useState('you@email.com');
-  const [phone, setPhone] = useState('+1 555 123 4567');
-  const [selectedCurrency, setSelectedCurrency] = useState(currencies[0]);
+  const [phone, setPhone] = useState('Enter your phone number');
+  const [selectedCurrency, setSelectedCurrency] = useState(currencies[2]);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
 
