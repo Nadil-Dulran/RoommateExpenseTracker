@@ -109,29 +109,47 @@ export default function ProfileScreen() {
           <Text style={styles.saveButtonText}>Save Changes</Text>
         </TouchableOpacity>
 
-     {/* Settings Fields */}
-        <View style={styles.secondcard}>
-          <Text style={styles.label}>Name</Text>
-          <TextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-          />
+      <View style={styles.settingsCard}>
+  
+       {/* Notifications */}
+       <TouchableOpacity style={styles.settingsRow}>
+          <View style={styles.iconWrapper}>
+         <Icon name="bell" size={20} color="#6B7280" />
+          </View>
 
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-          />
+         <Text style={styles.settingsText}>Notifications</Text>
 
-          <Text style={styles.label}>Phone</Text>
-          <TextInput
-            style={styles.input}
-            value={phone}
-            onChangeText={setPhone}
-          />
+        <Icon name="chevron-right" size={20} color="#9CA3AF" />
+        </TouchableOpacity>
+
+      <View style={styles.divider} />
+
+      {/* Preferences */}
+       <TouchableOpacity style={styles.settingsRow}>
+        <View style={styles.iconWrapper}>
+           <Icon name="settings" size={20} color="#6B7280" />
         </View>
+
+        <Text style={styles.settingsText}>Preferences</Text>
+
+         <Icon name="chevron-right" size={20} color="#9CA3AF" />
+       </TouchableOpacity>
+
+      <View style={styles.divider} />
+
+      {/* Help & Support */}
+     <TouchableOpacity style={styles.settingsRow}>
+      <View style={styles.iconWrapper}>
+        <Icon name="help-circle" size={20} color="#6B7280" />
+      </View>
+
+      <Text style={styles.settingsText}>Help & Support</Text>
+
+        <Icon name="chevron-right" size={20} color="#9CA3AF" />
+     </TouchableOpacity>
+
+    </View>
+
 
         {/* Sign Out */}
         <TouchableOpacity
@@ -313,12 +331,43 @@ const styles = StyleSheet.create({
     marginTop: 16,
     alignItems: 'center',
   },
-   secondcard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 5,
-    marginTop: 5,
-   },
+settingsCard: {
+  backgroundColor: '#FFFFFF',
+  marginHorizontal: 16,
+  marginTop: 20,
+  borderRadius: 20,
+  overflow: 'hidden',
+  borderWidth: 1,
+  borderColor: '#F3F4F6',
+},
+
+settingsRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: 18,
+  paddingHorizontal: 16,
+},
+
+iconWrapper: {
+  width: 44,
+  height: 44,
+  borderRadius: 14,
+  backgroundColor: '#F3F4F6',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 14,
+},
+
+settingsText: {
+  flex: 1,
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#111827',
+},
+
+divider: {
+  height: 1,
+  backgroundColor: '#F3F4F6',
+},
+
 });
