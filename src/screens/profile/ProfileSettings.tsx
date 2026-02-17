@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
 settingsCard: {
   backgroundColor: '#FFFFFF',
   marginHorizontal: 16,
-  marginTop: 20,
+  marginTop: 5,
   borderRadius: 20,
   overflow: 'hidden',
   borderWidth: 1,
