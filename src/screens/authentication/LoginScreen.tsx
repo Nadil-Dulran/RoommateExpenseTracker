@@ -11,6 +11,7 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
+import logoIcon from '../../../assets/Logo.png';
 import googleIcon from '../../../assets/google.png';
 import facebookIcon from '../../../assets/facebook.png';
 
@@ -62,7 +63,7 @@ const handleFacebookLogin = () => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.logo}>
-          <Text style={styles.logoText}>💰</Text>
+          <Image source={logoIcon} />
         </View>
         <Text style={styles.title}>Welcome Back</Text>
         <Text style={styles.subtitle}>
@@ -103,7 +104,7 @@ const handleFacebookLogin = () => {
             }}
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Icon name={showPassword ? 'eye' : 'eye-off'} size={18} color="#000000" />
+            <Icon name={showPassword ? 'eye' : 'eye-off'} size={18} color="#99A1AF" />
           </TouchableOpacity>
         </View>
         {errors.password && <Text style={styles.error}>{errors.password}</Text>}
@@ -159,7 +160,7 @@ const handleFacebookLogin = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#F9FAFB',
     paddingHorizontal: 20,
   },
   header: {
@@ -168,8 +169,8 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 60,
-    height: 60,
+    width: 63.9,
+    height: 63.9,
     backgroundColor: '#009966',
     borderRadius: 16,
     justifyContent: 'center',
@@ -193,14 +194,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
-        shadowColor: '#000',
-    shadowOpacity: 0.05,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
     shadowRadius: 10,
-    elevation: 3,
+    elevation: 1,
   },
   label: {
     fontSize: 12,
-    color: '#000000',
+    color: '#6A7282',
     marginBottom: 6,
   },
   inputWrapper: {
@@ -215,6 +216,8 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     marginLeft: 8,
+    fontSize: 14,
+    color: '#101828',
   },
   error: {
     color: '#ff2056',
@@ -227,7 +230,9 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     color: '#009966',
+    fontWeight: '600',
     fontSize: 13,
+    fontFamily: 'Inter',
   },
   button: {
     backgroundColor: '#009966',
