@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
+import { Image } from 'react-native';
+import logoIcon from '../../../assets/Logo.png';
 
 export default function ForgotPasswordScreen() {
   const navigation = useNavigation<any>();
@@ -97,7 +99,7 @@ export default function ForgotPasswordScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logo}>
-            <Text style={{ fontSize: 26 }}>💰</Text>
+            <Image source={logoIcon} />
           </View>
 
           <Text style={styles.title}>Forgot Password?</Text>
@@ -156,7 +158,7 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F9FAFB',
   },
   scroll: {
     padding: 20,
@@ -172,8 +174,8 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 60,
-    height: 60,
+    width: 63.9,
+    height: 63.9,
     backgroundColor: '#009966',
     borderRadius: 18,
     justifyContent: 'center',
@@ -192,13 +194,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 10,
-    elevation: 3,
+    elevation: 1,
   },
   label: {
     fontSize: 13,
@@ -286,7 +288,7 @@ const styles = StyleSheet.create({
   },
   contactLink: {
     color: '#009966',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   backRow: {
     flexDirection: 'row',
