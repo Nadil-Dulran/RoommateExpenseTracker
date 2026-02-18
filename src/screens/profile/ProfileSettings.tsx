@@ -14,6 +14,9 @@ import Icon from 'react-native-vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import profileIcon from '../../../assets/ProfileIcon.png';
 import { Image } from 'react-native';
+import notificationIcon from '../../../assets/notification.png';
+import settingsIcon from '../../../assets/settings.png';
+import helpIcon from '../../../assets/help.png';
 
 
 const currencies = [
@@ -38,14 +41,10 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         
-        {/* Back */}
-        <TouchableOpacity
-          style={styles.backRow}
-          onPress={() => navigation.navigate('Dashboard')}
-        >
-          <Icon name="arrow-left" size={18} color="#6a7282" />
-          <Text style={styles.backText}>Back to Dashboard</Text>
-        </TouchableOpacity>
+         {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
 
         {/* Profile Image */}
       <View style={styles.card}>
@@ -114,7 +113,7 @@ export default function ProfileScreen() {
        {/* Notifications */}
        <TouchableOpacity style={styles.settingsRow}>
           <View style={styles.iconWrapper}>
-         <Icon name="bell" size={20} color="#6B7280" />
+         <Image source={notificationIcon} style={{ width: 39.9, height: 39.9 }} />
           </View>
 
          <Text style={styles.settingsText}>Notifications</Text>
@@ -127,7 +126,7 @@ export default function ProfileScreen() {
       {/* Preferences */}
        <TouchableOpacity style={styles.settingsRow}>
         <View style={styles.iconWrapper}>
-           <Icon name="settings" size={20} color="#6B7280" />
+         <Image source={settingsIcon} style={{ width: 39.9, height: 39.9 }} />
         </View>
 
         <Text style={styles.settingsText}>Preferences</Text>
@@ -140,7 +139,7 @@ export default function ProfileScreen() {
       {/* Help & Support */}
      <TouchableOpacity style={styles.settingsRow}>
       <View style={styles.iconWrapper}>
-        <Icon name="help-circle" size={20} color="#6B7280" />
+        <Image source={helpIcon} style={{ width: 39.9, height: 39.9 }} />
       </View>
 
       <Text style={styles.settingsText}>Help & Support</Text>
@@ -159,6 +158,12 @@ export default function ProfileScreen() {
           <Icon name="log-out" size={20} color="#ff2056" />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
+
+      {/* Version */}
+      <View style={styles.versionContainer}>
+        <Text style={styles.versionText}>Version 1.0.0</Text>
+      </View>
+
       </ScrollView>
 
       {/* Currency Modal */}
@@ -166,29 +171,58 @@ export default function ProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Select Currency</Text>
+             <FlatList
+                data={currencies}
+                keyExtractor={(item) => item.code}
+                contentContainerStyle={{ paddingBottom: 10 }}
+                renderItem={({ item }) => {
+                const isSelected = selectedCurrency.code === item.code;
 
-            <FlatList
-              data={currencies}
-              keyExtractor={(item) => item.code}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.currencyItem}
-                  onPress={() => {
-                    setSelectedCurrency(item);
-                    setShowCurrencyModal(false);
-                  }}
-                >
-                  <Text style={styles.currencyItemText}>
-                    {item.code} - {item.name}
+                 return (
+            <TouchableOpacity
+                    activeOpacity={0.8}
+                     onPress={() => {
+                     setSelectedCurrency(item);
+                     setShowCurrencyModal(false);
+                     }}
+                    style={[
+                      styles.currencyCardModal,
+                      isSelected && styles.selectedCurrencyCardModal,
+                      ]}
+               >
+             {/* Symbol Circle */}
+               <View style={styles.symbolWrapperModal}>
+                   <Text style={styles.symbolTextModal}>
+                        {item.symbol}
                   </Text>
-                </TouchableOpacity>
-              )}
-            />
+               </View>
 
+             {/* Text */}
+                   <Text
+                      style={[
+                        styles.currencyTextModal,
+                        isSelected && styles.selectedCurrencyTextModal,
+                      ]}
+                     >
+                     {item.code} - {item.name}
+                  </Text>
+
+              {/* Check */}
+                 {isSelected && (
+               <View style={styles.checkWrapperModal}>
+                   <Icon name="check" size={14} color="#fff" />
+              </View>
+                  )}
+            </TouchableOpacity>
+             );
+           }}
+        />
+
+        
             <TouchableOpacity
               onPress={() => setShowCurrencyModal(false)}
-              style={styles.cancelButton}
-            >
+               style={styles.cancelButton}
+            > 
               <Text style={{ color: '#6a7282' }}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -203,19 +237,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 3,
+    backgroundColor: '#F9FAFB',
   },
-  backRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 16,
-  },
-  backText: {
-    marginLeft: 6,
-    color: '#6a7282',
-    fontWeight: '500',
+   header: {
+    padding: 20,
+    backgroundColor: '#fff',
   },
   headerTitle: {
     fontSize: 24,
@@ -230,10 +256,12 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
+    width: 96,
+    height: 96,
+    borderRadius: 60,
+    borderColor: '#F3F4F6',
+    borderWidth: 2,
+},
   cameraButton: {
     position: 'absolute',
     bottom: 0,
@@ -241,6 +269,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#009966',
     padding: 6,
     borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#F3F4F6',
   },
   changePhotoText: {
     marginTop: 10,
@@ -249,7 +279,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#fff',
-    marginHorizontal: 16,
+    marginHorizontal: 20,
     padding: 16,
     borderRadius: 16,
     marginBottom: 5,
@@ -257,15 +287,16 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    color: '#6a7282',
+    color: '#6A7282',
     marginTop: 25,
   },
   input: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    color: '#1018287b',
+    fontWeight: '500',
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#eeeeee7b',
   },
   currencyRow: {
     flexDirection: 'row',
@@ -276,13 +307,15 @@ const styles = StyleSheet.create({
   currencyText: {
     fontSize: 15,
     fontWeight: '600',
+    color: '#101828',
   },
   saveButton: {
     backgroundColor: '#009966',
-    margin: 16,
+    margin: 20,
     padding: 20,
     borderRadius: 12,
     alignItems: 'center',
+    elevation: 1,
   },
   saveButtonText: {
     color: '#fff',
@@ -290,7 +323,7 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     backgroundColor: '#fff',
-    marginHorizontal: 16,
+    marginHorizontal: 20,
     padding: 20,
     borderRadius: 12,
     flexDirection: 'row',
@@ -299,6 +332,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 20,
     marginTop: 16,
+    elevation: 1,
   },
   logoutText: {
     color: '#ff2056',
@@ -328,12 +362,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cancelButton: {
-    marginTop: 16,
+    backgroundColor: '#f9f7f7',
+    marginHorizontal: 3,
+    padding: 20,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+    marginTop: 16,
+    elevation: 2,
   },
 settingsCard: {
   backgroundColor: '#FFFFFF',
-  marginHorizontal: 16,
+  marginHorizontal: 20,
   marginTop: 5,
   borderRadius: 20,
   overflow: 'hidden',
@@ -361,8 +404,9 @@ iconWrapper: {
 settingsText: {
   flex: 1,
   fontSize: 16,
-  fontWeight: '600',
-  color: '#111827',
+  fontWeight: '700',
+  color: '#101828',
+  fontFamily: 'Inter',
 },
 
 divider: {
@@ -370,4 +414,61 @@ divider: {
   backgroundColor: '#F3F4F6',
 },
 
+versionContainer: {
+  alignItems: 'center',
+  padding: 8,
+},
+versionText: {
+  color: '#99A1AF',
+  fontSize: 12,
+  fontFamily: 'Inter-regular',
+},
+currencyCardModal: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#F3F4F6',
+  padding: 16,
+  borderRadius: 20,
+  marginBottom: 14,
+},
+selectedCurrencyCardModal: {
+  backgroundColor: '#E6F4ED',
+  borderWidth: 2,
+  borderColor: '#009966',
+},
+symbolWrapperModal: {
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  backgroundColor: '#FFFFFF',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginRight: 14,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+},
+symbolTextModal: {
+  fontSize: 18,
+  fontWeight: '600',
+  color: '#111827',
+},
+currencyTextModal: {
+  flex: 1,
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#111827',
+},
+
+selectedCurrencyTextModal: {
+  color: '#009966',
+},
+
+checkWrapperModal: {
+  width: 26,
+  height: 26,
+  borderRadius: 13,
+  backgroundColor: '#009966',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
 });
