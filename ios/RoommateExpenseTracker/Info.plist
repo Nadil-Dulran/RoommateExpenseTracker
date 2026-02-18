@@ -51,6 +51,7 @@
 	<false/>
 	<key>UIAppFonts</key>
 	<array>
+		<string>Outfit-VariableFont_wght.ttf</string>
 		<string>Fontisto.ttf</string>
 		<string>Octicons.ttf</string>
 		<string>Feather.ttf</string>
