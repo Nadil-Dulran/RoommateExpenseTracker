@@ -3,39 +3,28 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import  Login  from "../screens/authentication/LoginScreen";
 import Signup  from "../screens/authentication/SignupScreen";
 import  ForgotPassword  from "../screens/authentication/ForgetPasswordScreen";
-import Dashboard from '../screens/main/Dashboard';
-import ProfileSettings from '../screens/profile/ProfileSettings';
+import BottomTabs from './BottomTabs';
 
 const Stack = createNativeStackNavigator();
 
 const AppNavigator = () => {
     return (
-        <Stack.Navigator
-            initialRouteName="Login"
-            screenOptions={{ headerShown: false }}
-        >
-            <Stack.Screen
-                name="Login"
-                component={Login}
-            />
-            <Stack.Screen
-                name="Signup"
-                component={Signup}
-            />
-            <Stack.Screen
-                name="ForgotPassword"
-                component={ForgotPassword}
-            />
-            <Stack.Screen
-                name="Dashboard"
-                component={Dashboard}
-            />
-            <Stack.Screen
-                name="Profile"
-                component={ProfileSettings}
-            />
-        </Stack.Navigator>
-    );
+     
+      <Stack.Navigator
+        initialRouteName="Login"
+        screenOptions={{ headerShown: false }}
+      >
+      {/* Auth Screens */}
+
+      <Stack.Screen name="Login" component={Login} />
+      <Stack.Screen name="Signup" component={Signup} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+
+      {/* Main Screens */}
+
+      <Stack.Screen name="MainTabs" component={BottomTabs} />
+    </Stack.Navigator>
+  );
 };
 
 export default AppNavigator;
