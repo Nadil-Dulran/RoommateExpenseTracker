@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
 import googleIcon from '../../../assets/google.png';
 import facebookIcon from '../../../assets/facebook.png';
+import logoIcon from '../../../assets/Logo.png';
 
 
 export default function SignupScreen() {
@@ -87,7 +88,7 @@ export default function SignupScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logo}>
-            <Text style={{ fontSize: 26 }}>💰</Text>
+            <Image source={logoIcon} />
           </View>
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>
@@ -253,7 +254,7 @@ export default function SignupScreen() {
   );
 }
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
   scroll: { padding: 24, flexGrow: 1 },
 
   header: { alignItems: 'center', marginBottom: 30 },
@@ -273,7 +274,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
-    elevation: 4,
+    elevation: 1,
   },
 
   label: { fontSize: 13, color: '#000000', marginTop: 12 },
