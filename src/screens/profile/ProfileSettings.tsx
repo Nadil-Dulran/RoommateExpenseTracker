@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import profileIcon from '../../../assets/ProfileIcon.png';
 import { Image } from 'react-native';
 import notificationIcon from '../../../assets/notification.png';
@@ -36,8 +35,6 @@ export default function ProfileScreen() {
   const [showImageModal, setShowImageModal] = useState(false);
 
   return (
- <SafeAreaView style={styles.container}>
-    
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         
@@ -230,7 +227,6 @@ export default function ProfileScreen() {
       </Modal>
 
     </View>
-        </SafeAreaView>
   );
 }
 
@@ -417,6 +413,7 @@ divider: {
 versionContainer: {
   alignItems: 'center',
   padding: 8,
+  marginBottom: 20,
 },
 versionText: {
   color: '#99A1AF',
