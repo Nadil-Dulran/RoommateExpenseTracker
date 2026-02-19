@@ -6,18 +6,30 @@ export default function Dashboard() {
   const navigation = useNavigation<any>();
 
   return (
+        <View style={styles.container}>
     <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
       <Text style={{ fontSize: 24, fontWeight: "bold" }}>Welcome to the Dashboard!</Text>
       <View style={{ marginTop: 20 }}>
            <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Profile')}>
                 <Text style={styles.buttonText}>View Profile</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Activity')}>
+                <Text style={styles.buttonText}>View Activity</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Groups')}>
+                <Text style={styles.buttonText}>View Groups</Text>
+              </TouchableOpacity>
               </View>
+    </View>
     </View>
   );
 }
 
 const styles = {
+  container: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
   button: {
     marginTop: 20,
     paddingVertical: 10,
