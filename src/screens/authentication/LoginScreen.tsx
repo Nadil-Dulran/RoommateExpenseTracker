@@ -50,7 +50,7 @@ export default function LoginScreen() {
 
  const handleGoogleLogin = async () => {
   // Navigate like success
-  navigation.navigate('Dashboard');
+  navigation.navigate('MainTabs');
 };
 
 const handleFacebookLogin = () => {
