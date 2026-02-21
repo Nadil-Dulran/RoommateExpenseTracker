@@ -3,9 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   FlatList,
   Modal,
+  ScrollView,
   TextInput,
   Pressable,
 } from 'react-native';
@@ -29,13 +29,24 @@ export default function ExpensesScreen() {
 
   const [editDescription, setEditDescription] = useState('');
   const [editAmount, setEditAmount] = useState('');
+  const [splitType, setSplitType] = useState<'equal' | 'exact' | 'percentage'>('equal');
+  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>({});
 
 
-  const handleEdit = (item: Expense) => {
+
+const handleEdit = (item: Expense) => {
   setActiveMenuId(null);
   setSelectedExpense(item);
   setEditDescription(item.description);
   setEditAmount(item.amount.toString());
+
+  const initialExact: Record<string, string> = {};
+  item.splits.forEach(split => {
+    initialExact[split.userId] = split.amount.toString();
+  });
+
+  setExactAmounts(initialExact);
+  setSplitType('equal');
   setShowEditModal(true);
 };
 
@@ -103,12 +114,13 @@ const handleDelete = (item: Expense) => {
     ? item.amount - (myShare?.amount || 0)
     : 0;
 
-  return (
-    <View style={styles.card}>
-      <View style={styles.topRow}>
+return (
+  <View style={styles.card}>
+    {/* Top Row */}
+<View style={styles.topRow}>
   <Text style={styles.title}>{item.description}</Text>
 
-  <View style={styles.amountContainer}>
+  <View style={styles.amountRow}>
     <Text style={styles.amount}>
       ${item.amount.toFixed(2)}
     </Text>
@@ -116,15 +128,33 @@ const handleDelete = (item: Expense) => {
     <View style={{ position: 'relative' }}>
       <Pressable
         onPress={() =>
-          setActiveMenuId(activeMenuId === item.id ? null : item.id)
+          setActiveMenuId(
+            activeMenuId === item.id ? null : item.id
+          )
         }
         style={styles.menuButton}
       >
-        <Icon name="more-vertical" size={18} color="#6A7282" />
+        <Icon name="more-vertical" size={18} color="#98A2B3" />
       </Pressable>
 
       {activeMenuId === item.id && (
-        <View style={styles.dropdown} >
+        <View style={styles.dropdown}>
+
+           <Pressable
+            onPress={() => {
+              setActiveMenuId(null);
+              navigation.navigate('Activity', { expenseId: item.id } as never);
+            }}
+            style={styles.menuItem}
+          >
+            <View style={styles.menuRowItem}>
+              <Icon name="dollar-sign" size={16} color="#009966" />
+              <Text style={[styles.menuText, { color: '#009966' }]}>
+                Settle Up
+              </Text>
+            </View>
+          </Pressable>
+
           <Pressable
             onPress={() => handleEdit(item)}
             style={styles.menuItem}
@@ -147,20 +177,7 @@ const handleDelete = (item: Expense) => {
             </View>
           </Pressable>
 
-          <Pressable
-            onPress={() => {
-              setActiveMenuId(null);
-              navigation.navigate('Activity', { expenseId: item.id } as never);
-            }}
-            style={styles.menuItem}
-          >
-            <View style={styles.menuRowItem}>
-              <Icon name="dollar-sign" size={16} color="#009966" />
-              <Text style={[styles.menuText, { color: '#009966' }]}>
-                Settle Up
-              </Text>
-            </View>
-          </Pressable>
+
         </View>
       )}
     </View>
@@ -168,31 +185,65 @@ const handleDelete = (item: Expense) => {
 </View>
 
 
-      <Text style={styles.meta}>
-        {group?.emoji} {group?.name} • {formatDate(item.date)}
-      </Text>
+    {/* Group + Date */}
+    <Text style={styles.meta}>
+      {group?.emoji} {group?.name}  •  {formatDate(item.date)}
+    </Text>
 
-      <View style={styles.row}>
-        <Text style={styles.metaSmall}>Paid by </Text>
-        <Text style={styles.bold}>{item.paidBy.name}</Text>
-      </View>
+    {/* Paid + Owed */}
+    <View style={styles.paidRow}>
+      <Text style={styles.metaLight}>Paid by </Text>
+      <Text style={styles.bold}>{item.paidBy.name}</Text>
+
+      <Text style={styles.metaLight}>  •  </Text>
 
       {isMyExpense && amountOwed > 0 && (
-        <Text style={styles.owed}>
-          You are owed ${amountOwed.toFixed(2)}
+        <Text style={styles.owedText}>
+          You are owed:  ${amountOwed.toFixed(2)}
         </Text>
       )}
 
       {!isMyExpense && myShare && (
-        <Text style={styles.owe}>
+        <Text style={styles.oweText}>
           You owe ${myShare.amount.toFixed(2)}
         </Text>
       )}
-
-     
     </View>
-  );
-};
+
+    {/* Divider */}
+    <View style={styles.divider} />
+
+    {/* Split Pills */}
+    <View style={styles.splitRow}>
+<View style={styles.splitRow}>
+  <Text style={styles.metaLight}>Split:</Text>
+
+  {item.splits.map(split => {
+    let memberName = 'Unknown';
+
+    if (split.userId === currentUser.id) {
+      memberName = 'You';
+    } else if (split.userId === item.paidBy.id) {
+      memberName = item.paidBy.name;
+    } else {
+      const member = group?.members.find(
+        m => m.id === split.userId
+      );
+      memberName = member?.name ?? 'Unknown';
+    }
+
+    return (
+      <View key={split.userId} style={styles.splitPill}>
+        <Text style={styles.splitText}>
+          {memberName} ${split.amount.toFixed(2)}
+        </Text>
+      </View>
+    );
+  })}
+</View>
+    </View>
+  </View>
+);};
 
   return (
     <View style={styles.container}>
@@ -216,64 +267,175 @@ const handleDelete = (item: Expense) => {
 </View>
 
       {/* -------- Edit Modal -------- */}
-      <Modal visible={showEditModal} transparent animationType="slide">
-        <View style={styles.modalContainer}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Edit Expense</Text>
+    <Modal visible={showEditModal} transparent animationType="fade">
+  <View style={styles.modalOverlay}>
+    <View style={styles.editCard}>
 
-            <TextInput
-              placeholder="Description"
-              value={editDescription}
-              onChangeText={setEditDescription}
-              style={styles.input}
-            />
+      {/* Header */}
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Edit Expense</Text>
+        <Pressable onPress={() => setShowEditModal(false)}>
+          <Icon name="x" size={20} color="#6A7282" />
+        </Pressable>
+      </View>
 
-            <TextInput
-              placeholder="Amount"
-              value={editAmount}
-              onChangeText={setEditAmount}
-              keyboardType="numeric"
-              style={styles.input}
-            />
+      <ScrollView showsVerticalScrollIndicator={false}>
 
-            <View style={styles.rowBetween}>
-              <TouchableOpacity
-                onPress={() => setShowEditModal(false)}
+        {/* Description */}
+        <Text style={styles.label}>Description</Text>
+        <TextInput
+          value={editDescription}
+          onChangeText={setEditDescription}
+          style={styles.input}
+        />
+
+        {/* Amount */}
+        <Text style={styles.label}>Amount</Text>
+        <View style={styles.amountInputContainer}>
+          <Text style={styles.dollar}>$</Text>
+          <TextInput
+            value={editAmount}
+            onChangeText={setEditAmount}
+            keyboardType="numeric"
+            style={styles.amountInput}
+          />
+        </View>
+
+        {/* Split Selector */}
+        <Text style={styles.label}>Split</Text>
+        <View style={styles.splitRow}>
+          {['equal', 'exact', 'percentage'].map(type => (
+            <Pressable
+              key={type}
+              onPress={() => setSplitType(type as any)}
+              style={[
+                styles.splitButton,
+                splitType === type && styles.activeSplitButton
+              ]}
+            >
+              <Text
+                style={[
+                  styles.splitButtonText,
+                  splitType === type && styles.activeSplitText
+                ]}
               >
-                <Text style={styles.cancel}>Cancel</Text>
-              </TouchableOpacity>
+                {type === 'equal' ? 'Equal' : type === 'exact' ? 'Exact' : '%'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
 
-              <TouchableOpacity onPress={confirmEdit}>
-                <Text style={styles.save}>Save</Text>
-              </TouchableOpacity>
+        {/* Exact Split */}
+        {splitType === 'exact' && selectedExpense && (
+          <View style={styles.splitContainer}>
+            {selectedExpense.splits.map(split => {
+              const member =
+                split.userId === selectedExpense.paidBy.id
+                  ? selectedExpense.paidBy
+                  : groups
+                      .find(g => g.id === selectedExpense.groupId)
+                      ?.members.find(m => m.id === split.userId);
+
+              if (!member) return null;
+
+              return (
+                <View key={split.userId} style={styles.splitInputRow}>
+                  <Text>{member.name}</Text>
+                  <View style={styles.smallAmountContainer}>
+                    <Text>$</Text>
+                    <TextInput
+                      value={exactAmounts[split.userId]}
+                      onChangeText={val =>
+                        setExactAmounts({
+                          ...exactAmounts,
+                          [split.userId]: val,
+                        })
+                      }
+                      keyboardType="numeric"
+                      style={styles.smallAmountInput}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+
+            {/* Total */}
+            <View style={styles.totalRow}>
+              <Text>Total:</Text>
+              <Text style={{ fontWeight: '600', color: '#009966' }}>
+                $
+                {Object.values(exactAmounts)
+                  .reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
+                  .toFixed(2)}
+                {' / $'}
+                {editAmount}
+              </Text>
             </View>
           </View>
-        </View>
-      </Modal>
+        )}
+
+      </ScrollView>
+
+      {/* Buttons */}
+      <View style={styles.modalActions}>
+        <Pressable
+          style={styles.cancelBtn}
+          onPress={() => setShowEditModal(false)}
+        >
+          <Text style={{ fontWeight: '600' }}>Cancel</Text>
+        </Pressable>
+
+        <Pressable style={styles.saveBtn} onPress={confirmEdit}>
+          <Text style={{ color: 'white', fontWeight: '600' }}>
+            Save Changes
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  </View>
+</Modal>
+
 
       {/* -------- Delete Modal -------- */}
-      <Modal visible={showDeleteModal} transparent animationType="fade">
-        <View style={styles.modalContainer}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>
-              Delete this expense?
-            </Text>
+     <Modal visible={showDeleteModal} transparent animationType="fade">
+  <View style={styles.deleteOverlay}>
+    <View style={styles.deleteCard}>
 
-            <View style={styles.rowBetween}>
-              <TouchableOpacity
-                onPress={() => setShowDeleteModal(false)}
-              >
-                <Text style={styles.cancel}>Cancel</Text>
-              </TouchableOpacity>
+      {/* Icon */}
+      <View style={styles.deleteIconWrapper}>
+        <Icon name="trash-2" size={24} color="#FF2056" />
+      </View>
 
-              <TouchableOpacity onPress={confirmDelete}>
-                <Text style={styles.delete}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Title */}
+      <Text style={styles.deleteTitle}>Delete Expense?</Text>
+
+      {/* Message */}
+      <Text style={styles.deleteMessage}>
+        Are you sure you want to delete "{selectedExpense?.description}"?
+        {"\n"}This action cannot be undone.
+      </Text>
+
+      {/* Buttons */}
+      <View style={styles.deleteActions}>
+        <Pressable
+          style={styles.cancelDeleteBtn}
+          onPress={() => setShowDeleteModal(false)}
+        >
+          <Text style={styles.cancelDeleteText}>Cancel</Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.confirmDeleteBtn}
+          onPress={confirmDelete}
+        >
+          <Text style={styles.confirmDeleteText}>Delete</Text>
+        </Pressable>
+      </View>
+
     </View>
+  </View>
+</Modal>
+</View>
   );
 }
 const styles = StyleSheet.create({
@@ -293,27 +455,87 @@ const styles = StyleSheet.create({
     color: '#6A7282',
     marginBottom: 20,
   },
-  card: {
-    backgroundColor: '#FFF',
-    padding: 12,
-    borderRadius: 16,
-    marginBottom: 1,
-    overflow: 'visible',
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#101828',
-  },
-  amount: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  meta: {
-    fontSize: 12,
-    color: '#6A7282',
-    marginTop: 4,
-  },
+card: {
+  backgroundColor: '#FFFFFF',
+  borderRadius: 20,
+  padding: 18,
+  marginBottom: 16,
+
+  shadowColor: '#000',
+  shadowOpacity: 0.08,
+  elevation: 1,
+  overflow: 'visible', 
+},
+title: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#101828',
+},
+amountRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+amount: {
+  fontSize: 17,
+  fontWeight: '700',
+  color: '#101828',
+  marginRight: 8,
+},
+menuButton: {
+  padding: 4,
+},
+
+meta: {
+  fontSize: 13,
+  color: '#6A7282',
+  marginTop: 6,
+},
+metaLight: {
+  fontSize: 13,
+  color: '#98A2B3',
+},
+
+paidRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: 6,
+  flexWrap: 'wrap',
+},
+owedText: {
+  color: '#12B76A',
+  fontWeight: '600',
+},
+
+oweText: {
+  color: '#F04438',
+  fontWeight: '600',
+},
+
+divider: {
+  height: 1,
+  backgroundColor: '#F2F4F7',
+  marginVertical: 12,
+},
+splitRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 8,
+},
+
+splitPill: {
+  backgroundColor: '#F2F4F7',
+  paddingVertical: 6,
+  paddingHorizontal: 12,
+  borderRadius: 20,
+  marginLeft: 8,
+},
+
+splitText: {
+  fontSize: 12,
+  color: '#344054',
+},
   metaSmall: {
     fontSize: 12,
     color: '#99A1AF',
@@ -387,22 +609,17 @@ const styles = StyleSheet.create({
     fontWeight: '300',
     fontFamily: 'Inter',
   },
-  menuButton: {
-  padding: 6,
-},
 
 dropdown: {
   position: 'absolute',
   top: 28,
   right: 0,
-  width: 170,
+  width: 180,
   backgroundColor: '#FFFFFF',
   borderRadius: 16,
   paddingVertical: 8,
-
-  zIndex: 999,
+  zIndex: 1000,
   elevation: 20,
-
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 8 },
   shadowOpacity: 0.15,
@@ -423,7 +640,7 @@ menuText: {
 topRow: {
   flexDirection: 'row',
   justifyContent: 'space-between',
-  alignItems: 'flex-start',
+  alignItems: 'center',
 },
 
 amountContainer: {
@@ -442,5 +659,217 @@ menuIcon: {
   width: 16,
   height: 16,
 },
+
+modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  justifyContent: 'center',
+  padding: 20,
+},
+
+editCard: {
+  backgroundColor: '#FFF',
+  borderRadius: 24,
+  padding: 20,
+  maxHeight: '85%',
+},
+
+modalHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 20,
+},
+
+label: {
+  marginBottom: 6,
+  fontWeight: '500',
+  marginTop: 15,
+},
+
+amountInputContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 12,
+  paddingHorizontal: 12,
+},
+
+dollar: {
+  marginRight: 4,
+},
+
+amountInput: {
+  flex: 1,
+  paddingVertical: 10,
+},
+
+splitButton: {
+  flex: 1,
+  paddingVertical: 10,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 12,
+  alignItems: 'center',
+  marginHorizontal: 4,
+},
+
+activeSplitButton: {
+  borderColor: '#009966',
+  backgroundColor: '#E6F4EC',
+},
+
+splitButtonText: {
+  color: '#6A7282',
+},
+
+activeSplitText: {
+  color: '#009966',
+  fontWeight: '600',
+},
+
+splitContainer: {
+  marginTop: 15,
+  backgroundColor: '#F9FAFB',
+  borderRadius: 16,
+  padding: 15,
+},
+
+splitInputRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 10,
+},
+
+smallAmountContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 10,
+  paddingHorizontal: 8,
+},
+
+smallAmountInput: {
+  width: 50,
+  paddingVertical: 4,
+},
+
+totalRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginTop: 10,
+},
+
+modalActions: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginTop: 20,
+},
+
+cancelBtn: {
+  flex: 1,
+  backgroundColor: '#E5E7EB',
+  padding: 14,
+  borderRadius: 16,
+  alignItems: 'center',
+  marginRight: 10,
+},
+
+saveBtn: {
+  flex: 1,
+  backgroundColor: '#009966',
+  padding: 14,
+  borderRadius: 16,
+  alignItems: 'center',
+},
+
+deleteOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.45)',
+  justifyContent: 'center',
+  alignItems: 'center',
+  paddingHorizontal: 20,
+},
+
+deleteCard: {
+  width: '100%',
+  backgroundColor: '#FFFFFF',
+  borderRadius: 28,
+  paddingVertical: 30,
+  paddingHorizontal: 25,
+  alignItems: 'center',
+
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 10 },
+  shadowOpacity: 0.15,
+  shadowRadius: 25,
+  elevation: 10,
+},
+
+deleteIconWrapper: {
+  width: 48,
+  height: 48,
+  borderRadius: 35,
+  backgroundColor: '#FFF5F7',
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 20,
+},
+
+deleteTitle: {
+  fontSize: 20,
+  fontWeight: '700',
+  color: '#101828',
+  marginBottom: 10,
+},
+
+deleteMessage: {
+  fontSize: 14,
+  color: '#6A7282',
+  textAlign: 'center',
+  lineHeight: 20,
+  marginBottom: 25,
+},
+
+deleteActions: {
+  flexDirection: 'row',
+  width: '100%',
+  justifyContent: 'space-between',
+},
+
+cancelDeleteBtn: {
+  flex: 1,
+  backgroundColor: '#E5E7EB',
+  paddingVertical: 14,
+  borderRadius: 16,
+  alignItems: 'center',
+  marginRight: 10,
+},
+
+confirmDeleteBtn: {
+  flex: 1,
+  backgroundColor: '#FF2056',
+  paddingVertical: 14,
+  borderRadius: 16,
+  alignItems: 'center',
+},
+
+cancelDeleteText: {
+  fontWeight: '800',
+  color: '#101828',
+  fontFamily: 'Inter',
+  fontSize: 16,
+},
+
+confirmDeleteText: {
+  fontWeight: '800',
+  color: '#FFFFFF',
+  fontFamily: 'Inter',
+  fontSize: 16,
+},
+
 
 });
