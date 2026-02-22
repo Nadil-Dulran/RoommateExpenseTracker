@@ -5,8 +5,11 @@ export interface Split {
   amount: number;
 }
 
+export type CategoryType = 'food' | 'travel' | 'utilities';
+
 export interface Expense {
   id: string;
+  category: CategoryType;
   description: string;
   amount: number;
   date: string;    
