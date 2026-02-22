@@ -1,4 +1,6 @@
-import { Expense, Group, User } from '../types';
+import { Expense, Group, User, Notification } from '../types';
+import { CategoryType } from '../types/expense';
+
 
 export const currentUser: User = {
   id: '1',
@@ -14,6 +16,8 @@ export const groups: Group[] = [
     id: 'g1',
     name: 'Trip',
     emoji: '🏝️',
+    balance: 50,
+    balanceType: 'owed',
     members: [currentUser, user2],
   },
 ];
@@ -21,6 +25,7 @@ export const groups: Group[] = [
 export const expenses: Expense[] = [
   {
     id: 'e1',
+    category: 'food',
     description: 'Dinner',
     amount: 120,
     date: new Date().toISOString(),
@@ -32,3 +37,14 @@ export const expenses: Expense[] = [
     ],
   },
 ];
+
+export const notifications: Notification[] = [
+  { id: '1', read: false },
+  { id: '2', read: true },
+];
+
+export const categories: Record<CategoryType, { icon: string }> = {
+  food: { icon: '🍔' },
+  travel: { icon: '✈️' },
+  utilities: { icon: '🧾' },
+};
