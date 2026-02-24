@@ -8,8 +8,9 @@ import ActivityScreen from '../screens/main/ActivityScreen';
 import GroupsScreen from '../screens/main/GroupsScreen';
 import ExpensesScreen from '../screens/main/ExpensesScreen';
 import AddExpensScreen from '../screens/main/AddExpensScreen';
+import { BottomTabParamList } from '../types/navigation';
 
-const Tab = createBottomTabNavigator();
+const Tab = createBottomTabNavigator<BottomTabParamList>();
 
 const BottomTabs = () => {
   return (

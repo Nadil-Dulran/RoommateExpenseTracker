@@ -4,8 +4,11 @@ import  Login  from "../screens/authentication/LoginScreen";
 import Signup  from "../screens/authentication/SignupScreen";
 import  ForgotPassword  from "../screens/authentication/ForgetPasswordScreen";
 import BottomTabs from './BottomTabs';
+import SettleUpScreen from '../screens/external/SettleUpScreen';
+import NotificationScreen from '../screens/external/NotificationScreen';
+import { RootStackParamList } from '../types/navigation';
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const AppNavigator = () => {
     return (
@@ -21,8 +24,12 @@ const AppNavigator = () => {
       <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
 
       {/* Main Screens */}
-
       <Stack.Screen name="MainTabs" component={BottomTabs} />
+
+      {/* External Screens */}
+      <Stack.Screen name="SettleUp" component={SettleUpScreen} />
+      <Stack.Screen name="Notifications" component={NotificationScreen} />
+
     </Stack.Navigator>
   );
 };
