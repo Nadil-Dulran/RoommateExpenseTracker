@@ -16,8 +16,8 @@ export const groups: Group[] = [
     id: 'g1',
     name: 'Trip',
     emoji: '🏝️',
-    balance: 50,
-    balanceType: 'owed',
+    balance: 60,
+    balanceType: 'owing',
     members: [currentUser, user2],
   },
 ];
@@ -28,12 +28,12 @@ export const expenses: Expense[] = [
     category: 'food',
     description: 'Dinner',
     amount: 120,
-    date: new Date().toISOString(),
+    date: '2026-02-23T12:00:00Z',
     groupId: 'g1',
     paidBy: user2,
     splits: [
       { userId: '1', amount: 60 },
-      { userId: '2', amount: 80 },
+      { userId: '2', amount: 60 },
     ],
   },
 ];
@@ -41,6 +41,8 @@ export const expenses: Expense[] = [
 export const notifications: Notification[] = [
   { id: '1', read: false },
   { id: '2', read: true },
+  { id: '3', read: false },
+  { id: '4', read: false },
 ];
 
 export const categories: Record<CategoryType, { icon: string }> = {
@@ -48,3 +50,5 @@ export const categories: Record<CategoryType, { icon: string }> = {
   travel: { icon: '✈️' },
   utilities: { icon: '🧾' },
 };
+
+//new Date().toISOString(),
