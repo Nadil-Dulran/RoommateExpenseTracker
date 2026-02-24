@@ -16,8 +16,6 @@ export const groups: Group[] = [
     id: 'g1',
     name: 'Trip',
     emoji: '🏝️',
-    balance: 60,
-    balanceType: 'owing',
     members: [currentUser, user2],
   },
 ];
