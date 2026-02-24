@@ -143,7 +143,14 @@ return (
            <Pressable
             onPress={() => {
               setActiveMenuId(null);
-              navigation.navigate('Activity', { expenseId: item.id } as never);
+               const yourSplit = item.splits.find(
+               split => split.userId === currentUser.id
+              );
+              navigation.navigate('SettleUp', {
+                              mode: 'single',
+                              memberId: item.paidBy.id,
+                              amount:  yourSplit?.amount ?? 0,
+                             });
             }}
             style={styles.menuItem}
           >
@@ -443,7 +450,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
     paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingTop: 20,
   },
   header: {
     fontSize: 24,
