@@ -37,11 +37,50 @@ export const expenses: Expense[] = [
 ];
 
 export const notifications: Notification[] = [
-  { id: '1', read: false },
-  { id: '2', read: true },
-  { id: '3', read: false },
-  { id: '4', read: false },
+  {
+    id: '1',
+    read: false,
+    type: 'expense_added',
+    date: '2026-02-23T12:00:00Z',
+    message: 'added you to "Dinner"',
+    groupName: 'Trip',
+    groupEmoji: '🏝️',
+    relatedUser: {
+      id: '2',
+      name: 'Sarah',
+      avatar: '../../assets/ProfileIcon.png',
+    },
+    expense: {
+      category: 'food',
+      splits: [
+        { userId: '1', amount: 60 },
+        { userId: '2', amount: 60 },
+      ],
+    },
+  },
+  {
+    id: '2',
+    read: true,
+    type: 'expense_settled',
+    date: '2026-02-22T12:00:00Z',
+    message: 'settled up "Dinner"',
+    groupName: 'Trip',
+    groupEmoji: '🏝️',
+    relatedUser: {
+      id: '2',
+      name: 'Sarah',
+      avatar: '../../assets/ProfileIcon.png',
+    },
+    expense: {
+      category: 'utilities',
+      splits: [
+        { userId: '1', amount: 60 },
+        { userId: '2', amount: 60 },
+      ],
+    },
+  },
 ];
+
 
 export const categories: Record<CategoryType, { icon: string }> = {
   food: { icon: '🍔' },
