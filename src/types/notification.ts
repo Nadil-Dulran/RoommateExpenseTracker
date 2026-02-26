@@ -12,7 +12,7 @@ export interface Notification {
   relatedUser: {
     id: string;
     name: string;
-    avatar: string;
+    avatar: number; // Using require for images returns a number in React Native
   };
   expense?: {
     category: CategoryType;
