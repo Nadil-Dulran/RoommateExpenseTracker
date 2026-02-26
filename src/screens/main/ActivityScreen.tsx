@@ -289,8 +289,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     backgroundColor: '#f3f4f6',
-    marginTop: 10,
-    marginBottom: 10,
+    marginTop: 6,
   },
   filterActive: {
     backgroundColor: '#009966',
