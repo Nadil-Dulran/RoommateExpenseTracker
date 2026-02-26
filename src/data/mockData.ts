@@ -1,22 +1,34 @@
 import { Expense, Group, User, Notification } from '../types';
 import { CategoryType } from '../types/expense';
+import profileIcon from '../../assets/ProfileIcon.png';
 
 
 export const currentUser: User = {
   id: '1',
   name: 'John Doe',
+  email: 'john.doe@example.com',
+  avatar: profileIcon,
 };
+
 export const user2: User = {
   id: '2',
   name: 'Sarah',
+  avatar: profileIcon,
 };
+
+export const user3: User = {
+  id: '3',
+  name: 'Mike',
+  avatar: profileIcon,
+};
+
 
 export const groups: Group[] = [
   {
     id: 'g1',
     name: 'Trip',
     emoji: '🏝️',
-    members: [currentUser, user2],
+    members: [currentUser, user2, user3],
   },
 ];
 
@@ -48,7 +60,7 @@ export const notifications: Notification[] = [
     relatedUser: {
       id: '2',
       name: 'Sarah',
-      avatar: '../../assets/ProfileIcon.png',
+      avatar: profileIcon,
     },
     expense: {
       category: 'food',
@@ -69,7 +81,7 @@ export const notifications: Notification[] = [
     relatedUser: {
       id: '2',
       name: 'Sarah',
-      avatar: '../../assets/ProfileIcon.png',
+      avatar: profileIcon,
     },
     expense: {
       category: 'utilities',
