@@ -10,6 +10,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { notifications as initialNotifications, categories } from '../../data/mockData';
+import { Notification } from '../../types/notification';
 
 const NotificationsScreen = () => {
   const navigation = useNavigation<any>();
@@ -27,36 +28,15 @@ const NotificationsScreen = () => {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+};
 
-  interface Notification {
-  id: string;
-  read: boolean;
-  type: string;
-  date: string;
-  message: string;
-  groupEmoji: string;
-  groupName: string;
-  relatedUser?: {
-    name: string;
-    avatar: string;
-  };
-  expense?: {
-    category: string;
-    splits: {
-      userId: string;
-      amount: number;
-    }[];
-  };
-}
-
-  const renderItem = ({ item }: { item: Notification }) => {
+const renderItem = ({ item }: { item: Notification }) => {
     const category = item.expense
       ? categories[item.expense.category as keyof typeof categories]
       : null;
