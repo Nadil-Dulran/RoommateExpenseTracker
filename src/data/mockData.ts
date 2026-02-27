@@ -94,10 +94,13 @@ export const notifications: Notification[] = [
 ];
 
 
-export const categories: Record<CategoryType, { icon: string }> = {
-  food: { icon: '🍔' },
-  travel: { icon: '✈️' },
-  utilities: { icon: '🧾' },
+export const categories: Record<CategoryType, { icon: string; name: string }> = {
+  food: { icon: '🍔', name: 'Food' },
+  travel: { icon: '🚗', name: 'Transport' },
+  shopping: { icon: '🛍️', name: 'Shopping' },
+  utilities: { icon: '🧾', name: 'Bills' },
+  entertainment: { icon: '🎬', name: 'Entertainment' },
+  other: { icon: '📌', name: 'Other' },
 };
 
 //new Date().toISOString(),
