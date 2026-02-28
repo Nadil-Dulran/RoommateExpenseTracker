@@ -11,6 +11,8 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { notifications as initialNotifications, categories } from '../../data/mockData';
 import { Notification } from '../../types/notification';
+import { currentUser } from '../../data/mockData';
+
 
 const NotificationsScreen = () => {
   const navigation = useNavigation<any>();
@@ -42,7 +44,7 @@ const renderItem = ({ item }: { item: Notification }) => {
       : null;
 
     const userShare = item.expense?.splits.find(
-      (s: any) => s.userId === 'user1'
+      (s: any) => s.userId === currentUser.id
     );
 
     return (
@@ -84,7 +86,7 @@ const renderItem = ({ item }: { item: Notification }) => {
                     ? 'dollar-sign'
                     : 'check-circle'
                 }
-                size={10}
+                size={13}
                 color="#fff"
               />
             </View>
@@ -247,12 +249,12 @@ const styles = StyleSheet.create({
     borderRadius: 21,
   },
   badge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    position: 'relative',
+    top: -13,  
+    right: -28,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
