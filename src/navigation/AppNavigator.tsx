@@ -7,6 +7,7 @@ import BottomTabs from './BottomTabs';
 import SettleUpScreen from '../screens/external/SettleUpScreen';
 import NotificationScreen from '../screens/external/NotificationScreen';
 import { RootStackParamList } from '../types/navigation';
+import GroupDetailsScreen from '../screens/external/GroupDetailsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -29,6 +30,7 @@ const AppNavigator = () => {
       {/* External Screens */}
       <Stack.Screen name="SettleUp" component={SettleUpScreen} />
       <Stack.Screen name="Notifications" component={NotificationScreen} />
+      <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
 
     </Stack.Navigator>
   );
