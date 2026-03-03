@@ -28,7 +28,8 @@ export default function GroupDetailsScreen() {
   const navigation = useNavigation<NavProps>();
 
   const { id } = route.params;
-
+  
+  const user = currentUser; // Simulate logged in user
   const group = groups.find(g => g.id === id);
   const groupExpenses = expenses.filter(e => e.groupId === id);
 
@@ -57,13 +58,28 @@ export default function GroupDetailsScreen() {
   );
 
   const memberBalances = useMemo(
-    () => calculateMemberBalances(groupExpenses, currentUser),
+    () => {
+      return calculateMemberBalances(groupExpenses, currentUser).map(member => {
+        const fullMember = group.members.find(m => m.id === member.id);
+        return { ...member, ...fullMember };
+      });
+    },
     [groupExpenses]
   );
 
   // ---------------------------
   // UI
   // ---------------------------
+const renderAvatar = (avatar?: string | any) => {
+  if (!avatar) {
+    return require('../../../assets/ProfileIcon.png'); // fallback image
+  }
+
+  return typeof avatar === 'string'
+    ? { uri: avatar }
+    : avatar;
+};
+
 
   return (
     <View style={styles.container}>
@@ -88,13 +104,16 @@ export default function GroupDetailsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.groupName}>{group.name}</Text>
 
-            <View style={styles.memberAvatars}>
-              {group.members.map(member => (
-                <View key={member.id} style={styles.avatarCircle}>
-                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                    {member.name[0]}
-                  </Text>
-                </View>
+            <View style={styles.avatarStack}>
+              {group.members.slice(0, 4).map((member, index) => (
+                <Image
+                  key={member.id}
+                  source={member.avatar}
+                  style={[
+                    styles.avatar,
+                    { marginLeft: index === 0 ? 0 : -10 },
+                  ]}
+                />
               ))}
             </View>
           </View>
@@ -146,11 +165,10 @@ export default function GroupDetailsScreen() {
             ]}
           >
             <View style={styles.memberLeft}>
-              <View style={styles.avatarCircle}>
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-                  {member.name[0]}
-                </Text>
-              </View>
+             <Image
+               source={renderAvatar(member.avatar)}
+               style={styles.avatarLarge}
+             />
 
               <View>
                 <Text style={styles.memberName}>
@@ -201,9 +219,52 @@ export default function GroupDetailsScreen() {
           </View>
         ))}
 
+        {/* Group Members */}
+        <View style={styles.membersSection}>
+  {/* Header */}
+  <View style={styles.membersHeader}>
+    <Text style={styles.membersCount}>
+      {group.members.length} members
+    </Text>
+
+    <TouchableOpacity style={styles.addBtn}>
+      <Icon name="user-plus" size={16} color="#009966" />
+      <Text style={styles.addText}>Add</Text>
+    </TouchableOpacity>
+  </View>
+
+  {/* Members List */}
+  {group.members.map(member => (
+    <View key={member.id} style={styles.memberRow}>
+      <View style={styles.memberRowLeft}>
+      <Image
+        source={renderAvatar(member.avatar)}
+        style={styles.avatarLarge}
+      />
+
+        <View>
+          <Text style={styles.memberRowName}>
+            {member.name}
+            {member.id === currentUser.id && (
+              <Text style={styles.youLabel}> (you)</Text>
+            )}
+          </Text>
+        </View>
+      </View>
+
+      {member.id !== currentUser.id && (
+        <TouchableOpacity style={styles.removeBtn}>
+          <Icon name="user-minus" size={16} color="#ff2056" />
+        </TouchableOpacity>
+      )}
+    </View>
+  ))}
+</View>
+
+
         {/* Recent Expenses */}
         <View style={styles.expenseHeader}>
-          <Text style={styles.sectionTitle}>Recent Expenses</Text>
+          <Text style={styles.sectionTitlee}>Recent Expenses</Text>
 
           <TouchableOpacity
             onPress={() =>
@@ -335,7 +396,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#009966',
+    backgroundColor: '#a3b3ae',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 6,
@@ -365,6 +426,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6a7282',
     marginHorizontal: 20,
+    marginBottom: 10,
+  },
+    sectionTitlee: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6a7282',
     marginBottom: 10,
   },
 
@@ -476,4 +543,94 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
   },
+  avatarStack: {
+  flexDirection: 'row',
+  marginRight: 8,
+},
+
+avatar: {
+  width: 22,
+  height: 22,
+  borderRadius: 11,
+  borderWidth: 2,
+  borderColor: '#fff',
+},
+membersSection: {
+  marginHorizontal: 20,
+  marginTop: 20,
+  marginBottom: 10,
+},
+
+membersHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 12,
+},
+
+membersCount: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#6a7282',
+},
+
+addBtn: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 4,
+},
+
+addText: {
+  color: '#009966',
+  fontWeight: '600',
+  marginLeft: 4,
+},
+
+memberRow: {
+  backgroundColor: '#ffffff',
+  paddingVertical: 12,
+  paddingHorizontal: 14,
+  borderRadius: 14,
+  marginBottom: 8,
+  borderWidth: 1,
+  borderColor: '#f3f4f6',
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+},
+
+memberRowLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+
+avatarLarge: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  marginRight: 12,
+  borderWidth: 2,
+  borderColor: '#fff',
+},
+
+avatarText: {
+  color: '#fff',
+  fontWeight: 'bold',
+},
+
+memberRowName: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#101828',
+},
+
+youLabel: {
+  fontSize: 13,
+  fontWeight: '400',
+  color: '#6a7282',
+},
+
+removeBtn: {
+  padding: 6,
+},
 });
