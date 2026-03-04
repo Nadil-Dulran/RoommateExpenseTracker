@@ -216,30 +216,7 @@ export default function ActivityScreen() {
                               style={
                                 styles.settleBtn
                               }
-                              onPress={() =>
-                                navigation.navigate(
-                                  'SettleUp',
-                                  {
-                                    mode:
-                                      'single',
-                                    memberId:
-                                      expense
-                                        .paidBy
-                                        .id === currentUser.id
-                                        ? expense.splits.find(
-                                            s =>
-                                              s.userId !== currentUser.id
-                                          )
-                                            ?.userId ??
-                                          ''
-                                        : expense
-                                            .paidBy
-                                            .id,
-                                    amount:
-                                      share.amount,
-                                  }
-                                )
-                              }
+                              onPress={() => navigation.navigate('SettleUp', { mode: 'single', memberId: expense .paidBy .id === currentUser.id ? expense.splits.find( s => s.userId !== currentUser.id ) ?.userId ?? '' : expense .paidBy .id, amount: share.amount, })}
                             >
                               <Text
                                 style={
