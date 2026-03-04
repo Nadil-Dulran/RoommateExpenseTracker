@@ -256,7 +256,7 @@ const renderAvatar = (avatar?: string | any) => {
             <Text style={{ fontSize: 28 }}>{group.emoji}</Text>
           </View>
 
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 0 }}>
             <Text style={styles.groupName}>{group.name}</Text>
 
             <View style={styles.avatarStack}>
@@ -694,30 +694,31 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 20,
+    paddingTop: 20,
+    paddingHorizontal: 10,
   },
 
   groupInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 23,
   },
 
   emojiBox: {
     width: 70,
     height: 70,
     borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#d4d6da',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
   },
 
   groupName: {
-    fontSize: 22,
+    fontSize: 25,
     fontWeight: 'bold',
-    marginBottom: 6,
+    marginBottom: 7,
   },
 
   balanceCard: {
