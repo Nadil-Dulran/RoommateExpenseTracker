@@ -14,7 +14,8 @@ import { Image } from 'react-native';
 import logoIcon from '../../../assets/Logo.png';
 import googleIcon from '../../../assets/google.png';
 import facebookIcon from '../../../assets/facebook.png';
-
+import { authService } from '../../services/authService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
@@ -24,7 +25,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const newErrors: { email?: string; password?: string } = {};
 
 
@@ -45,7 +46,31 @@ export default function LoginScreen() {
       return;
     }
 
-    navigation.navigate('Dashboard');
+    // Backend login logic
+
+      try {
+
+    const result = await authService.login({
+      email,
+      password,
+    });
+
+    if (result.token) {
+
+      await AsyncStorage.setItem('token', result.token);
+
+      navigation.navigate('MainTabs');
+
+    } else {
+
+      Alert.alert(result.message);
+
+    }
+
+  } catch (error) {
+    console.log(error);
+    Alert.alert('Login failed');
+  }
   };
 
  const handleGoogleLogin = async () => {
