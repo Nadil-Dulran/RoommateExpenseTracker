@@ -15,6 +15,8 @@ import { Image } from 'react-native';
 import googleIcon from '../../../assets/google.png';
 import facebookIcon from '../../../assets/facebook.png';
 import logoIcon from '../../../assets/Logo.png';
+import { authService } from '../../services/authService';
+
 
 
 export default function SignupScreen() {
@@ -38,7 +40,7 @@ export default function SignupScreen() {
     setErrors({ ...errors, [field]: undefined });
   };
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     const newErrors: any = {};
 
     if (!formData.name.trim())
@@ -68,8 +70,27 @@ export default function SignupScreen() {
       return;
     }
 
-    // Later connect to backend
-    navigation.navigate('Dashboard');
+    // Backend API call
+      try {
+
+    const result = await authService.register({
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      password: formData.password,
+    });
+
+    if (result.message === 'User created successfully') {
+      Alert.alert('Account created');
+      navigation.navigate('Login');
+    } else {
+      Alert.alert(result.message);
+    }
+
+  } catch (error) {
+    console.log(error);
+    Alert.alert('Signup failed');
+  }
   };
 
    const handleGoogleLogin = async () => {
