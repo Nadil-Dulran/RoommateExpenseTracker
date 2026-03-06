@@ -1,10 +1,10 @@
-const API_URL = 'http://10.0.2.2:3000/api/auth';
+import API_URL from './api';
 
 export const authService = {
 
   register: async (data: any) => {
 
-    const response = await fetch(`${API_URL}/register`, {
+    const response = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -17,7 +17,7 @@ export const authService = {
 
   login: async (data: any) => {
 
-    const response = await fetch(`${API_URL}/login`, {
+    const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
