@@ -16,6 +16,7 @@ import { Image } from 'react-native';
 import notificationIcon from '../../../assets/notification.png';
 import settingsIcon from '../../../assets/settings.png';
 import helpIcon from '../../../assets/help.png';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const currencies = [
@@ -26,6 +27,11 @@ const currencies = [
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
+
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem('token');
+    navigation.navigate('Login');
+  };
 
   const [name, setName] = useState('Enter your name');
   const [email, setEmail] = useState('you@email.com');
@@ -150,7 +156,7 @@ export default function ProfileScreen() {
         {/* Sign Out */}
         <TouchableOpacity
           style={styles.logoutButton}
-          onPress={() => navigation.navigate('Login')}
+          onPress={handleLogout}
         >
           <Icon name="log-out" size={20} color="#ff2056" />
           <Text style={styles.logoutText}>Sign Out</Text>
