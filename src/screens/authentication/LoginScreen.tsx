@@ -55,7 +55,7 @@ export default function LoginScreen() {
       password,
     });
 
-    if (result.token) {
+    if (result.success) {
 
       await AsyncStorage.setItem('token', result.token);
 
@@ -63,7 +63,14 @@ export default function LoginScreen() {
 
     } else {
 
-      Alert.alert(result.message);
+      if (result.message === 'Invalid credentials') {
+     newErrors.password = 'Incorrect password';
+     }else if(result.message === 'User not found') {
+     newErrors.email = 'No account found with this email';
+     } else {
+     newErrors.password = 'An unexpected error occurred. Please try again.';
+     }
+      setErrors(newErrors);
 
     }
 
