@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
@@ -17,6 +19,7 @@ import notificationIcon from '../../../assets/notification.png';
 import settingsIcon from '../../../assets/settings.png';
 import helpIcon from '../../../assets/help.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { profileService } from '../../services/profileService';
 
 
 const currencies = [
@@ -28,17 +31,92 @@ const currencies = [
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
 
-  const handleLogout = async () => {
-    await AsyncStorage.removeItem('token');
-    navigation.navigate('Login');
-  };
-
-  const [name, setName] = useState('Enter your name');
-  const [email, setEmail] = useState('you@email.com');
-  const [phone, setPhone] = useState('Enter your phone number');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState(currencies[2]);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
-  const [showImageModal, setShowImageModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('token');
+      navigation.navigate('Login');
+    } catch (error) {
+      Alert.alert('Sign out failed');
+    }
+  };
+
+  const loadProfile = useCallback(async () => {
+    try {
+      setIsLoading(true);
+
+      const data = await profileService.getProfile();
+
+      setName(data.name || '');
+      setEmail(data.email || '');
+      setPhone(data.phone || '');
+
+      const currency = currencies.find(c => c.code === data.currency);
+
+      if (currency) {
+        setSelectedCurrency(currency);
+      }
+    } catch (error) {
+      console.log('Failed to load profile', error);
+
+      if (error instanceof Error && error.message === 'No auth token found') {
+        Alert.alert('Session expired', 'Please login again.');
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Failed to load profile', error instanceof Error ? error.message : 'Unknown error');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigation]);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+
+      await profileService.updateProfile({
+        name,
+        email,
+        phone,
+        currency: selectedCurrency.code,
+      });
+      setShowSuccessToast(true);
+      setTimeout(() => {
+        setShowSuccessToast(false);
+      }, 2200);
+    } catch (error) {
+      console.log('Update failed', error);
+
+      if (error instanceof Error && error.message === 'No auth token found') {
+        Alert.alert('Session expired', 'Please login again.');
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Update failed', error instanceof Error ? error.message : 'Unknown error');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#009966" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -59,15 +137,11 @@ export default function ProfileScreen() {
             />
             <TouchableOpacity
               style={styles.cameraButton}
-              onPress={() => setShowImageModal(true)}
+              onPress={() => Alert.alert('Change photo', 'Profile photo update coming soon.')}
             >
               <Icon name="camera" size={16} color="#fff" />
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity onPress={() => setShowImageModal(true)}>
-            <Text style={styles.changePhotoText}>Change Photo</Text>
-          </TouchableOpacity>
         </View>
       </View>  
 
@@ -107,9 +181,20 @@ export default function ProfileScreen() {
         </View>
 
         {/* Save Button */}
-        <TouchableOpacity style={styles.saveButton}>
+        <TouchableOpacity
+          style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+          onPress={handleSave}
+          disabled={isSaving}
+        >
           <Text style={styles.saveButtonText}>Save Changes</Text>
         </TouchableOpacity>
+
+        {showSuccessToast && (
+          <View style={styles.successToast}>
+            <Icon name="check-circle" size={16} color="#16A34A" />
+            <Text style={styles.successToastText}>Profile updated successfully</Text>
+          </View>
+        )}
 
       <View style={styles.settingsCard}>
   
@@ -241,6 +326,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
    header: {
     padding: 20,
     backgroundColor: '#fff',
@@ -319,9 +410,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 1,
   },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
   saveButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  successToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: -6,
+    marginBottom: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#D1FAE5',
+  },
+  successToastText: {
+    color: '#166534',
+    fontWeight: '600',
   },
   logoutButton: {
     backgroundColor: '#fff',
