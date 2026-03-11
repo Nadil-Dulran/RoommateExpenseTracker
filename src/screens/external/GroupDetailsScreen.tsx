@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import {
 } from '../../services/financeService';
 import { User } from '../../types';
 import { groupsService } from '../../services/groupsService';
+import { groupMembersService } from '../../services/groupMembersService';
 
 type RouteProps = RouteProp<RootStackParamList, 'GroupDetails'>;
 type NavProps = NativeStackNavigationProp<RootStackParamList>;
@@ -59,6 +60,55 @@ export default function GroupDetailsScreen() {
 
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
+
+  const normalizeMembers = (membersRaw: any[]) => {
+    return (membersRaw || []).map((member: any, index: number) => ({
+      id: String(member?.id ?? member?._id ?? member?.userId ?? `member-${index}`),
+      name: member?.name ?? member?.fullName ?? 'Member',
+      avatar:
+        member?.avatar ??
+        member?.avatar_url ??
+        member?.avatarUrl ??
+        member?.profileImage ??
+        null,
+    }));
+  };
+
+  const extractMembersPayload = (data: any) => {
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    if (Array.isArray(data?.data)) {
+      return data.data;
+    }
+
+    if (Array.isArray(data?.members)) {
+      return data.members;
+    }
+
+    return [];
+  };
+
+  const loadGroupMembers = useCallback(async () => {
+    try {
+      const response = await groupMembersService.getMembers(group?.id ?? id);
+      const members = normalizeMembers(extractMembersPayload(response));
+
+      if (members.length > 0) {
+        setGroupData((prev: any) => ({
+          ...prev,
+          members,
+        }));
+      }
+    } catch (error) {
+      console.log('Failed to load group members', error);
+    }
+  }, [group?.id, id]);
+
+  useEffect(() => {
+    loadGroupMembers();
+  }, [loadGroupMembers]);
 
   const handleUpdateGroup = async () => {
     try {
@@ -117,11 +167,11 @@ export default function GroupDetailsScreen() {
   const memberBalances = useMemo(
     () => {
       return calculateMemberBalances(groupExpenses, currentUser).map(member => {
-        const fullMember = group.members.find((m: any) => m.id === member.id);
+        const fullMember = (group.members || []).find((m: any) => m.id === member.id);
         return { ...member, ...fullMember };
       });
     },
-    [groupExpenses]
+    [groupExpenses, group?.members]
   );
 
   // ---------------------------
@@ -295,10 +345,10 @@ const renderAvatar = (avatar?: string | any) => {
             <Text style={styles.groupName}>{group.name}</Text>
 
             <View style={styles.avatarStack}>
-              {group.members.slice(0, 4).map((member: any, index: number) => (
+              {(group.members || []).slice(0, 4).map((member: any, index: number) => (
                 <Image
                   key={member.id}
-                  source={member.avatar}
+                  source={renderAvatar(member.avatar)}
                   style={[
                     styles.avatar,
                     { marginLeft: index === 0 ? 0 : -10 },
@@ -420,7 +470,7 @@ const renderAvatar = (avatar?: string | any) => {
   {/* Header */}
   <View style={styles.membersHeader}>
     <Text style={styles.membersCount}>
-      {group.members.length} members
+      {(group.members || []).length} members
     </Text>
 
     <TouchableOpacity
@@ -525,7 +575,7 @@ const renderAvatar = (avatar?: string | any) => {
 </Modal>
 
   {/* Members List */}
-  {group.members.map((member: any) => (
+  {(group.members || []).map((member: any) => (
     <View key={member.id} style={styles.memberRow}>
       <View style={styles.memberRowLeft}>
       <Image
@@ -597,16 +647,25 @@ const renderAvatar = (avatar?: string | any) => {
 
         <TouchableOpacity
           style={styles.confirmRemoveButton}
-          onPress={() => {
-            if (memberToRemove) {
-              // Remove member from group
-              group.members = group.members.filter(
-                (m: any) => m.id !== memberToRemove.id
+          onPress={async () => {
+            try {
+              if (memberToRemove) {
+                await groupMembersService.removeMember(group?.id ?? id, memberToRemove.id);
+
+                setGroupData((prev: any) => ({
+                  ...prev,
+                  members: (prev?.members || []).filter((m: any) => m.id !== memberToRemove.id),
+                }));
+              }
+
+              setShowRemoveModal(false);
+              setMemberToRemove(null);
+            } catch (error) {
+              Alert.alert(
+                'Remove failed',
+                error instanceof Error ? error.message : 'Unknown error'
               );
             }
-
-            setShowRemoveModal(false);
-            setMemberToRemove(null);
           }}
         >
           <Text style={styles.confirmRemoveText}>Remove</Text>

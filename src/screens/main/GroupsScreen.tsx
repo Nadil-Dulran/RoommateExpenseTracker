@@ -15,6 +15,7 @@ import { BottomTabParamList, RootStackParamList } from '../../types/navigation';
 import Icon from 'react-native-vector-icons/Feather';
 import { Image } from 'react-native';
 import { groupsService } from '../../services/groupsService';
+import { groupMembersService } from '../../services/groupMembersService';
 import profileIcon from '../../../assets/ProfileIcon.png';
 
 type GroupsNavigationProp = CompositeNavigationProp<
@@ -39,6 +40,30 @@ export default function GroupsScreen() {
     return typeof avatar === 'string' ? { uri: avatar } : avatar;
   };
 
+  const normalizeMembers = (membersRaw: any[]) => {
+    return (membersRaw || []).map((member: any, index: number) => ({
+      id: String(member.id ?? `member-${index}`),
+      name: member.name ?? 'Member',
+      avatar: member.avatar_url ?? null,
+    }));
+  };
+
+  const extractMembersPayload = (data: any) => {
+    if (Array.isArray(data)) {
+      return data;
+    }
+
+    if (Array.isArray(data?.data)) {
+      return data.data;
+    }
+
+    if (Array.isArray(data?.members)) {
+      return data.members;
+    }
+
+    return [];
+  };
+
   const normalizeGroup = (group: any) => {
     const membersRaw = Array.isArray(group?.members)
       ? group.members
@@ -48,11 +73,7 @@ export default function GroupsScreen() {
       ? group.participants
       : [];
 
-    const members = membersRaw.map((member: any, index: number) => ({
-      id: String(member.id ),
-      name: member.name,
-      avatar: member.avatar_url || null,
-    }));
+    const members = normalizeMembers(membersRaw);
 
     return {
       id: String(group.id ),
@@ -78,7 +99,29 @@ export default function GroupsScreen() {
             ? data.groups
             : [];
 
-      setGroups(normalizedGroups.map(normalizeGroup));
+      const baseGroups = normalizedGroups.map(normalizeGroup);
+
+      const groupsWithMembers = await Promise.all(
+        baseGroups.map(async (group: any) => {
+          if (!group?.id) {
+            return group;
+          }
+
+          try {
+            const membersResponse = await groupMembersService.getMembers(group.id);
+            const members = normalizeMembers(extractMembersPayload(membersResponse));
+
+            return {
+              ...group,
+              members: members.length > 0 ? members : group.members,
+            };
+          } catch (error) {
+            return group;
+          }
+        })
+      );
+
+      setGroups(groupsWithMembers);
 
     } catch (error) {
 
