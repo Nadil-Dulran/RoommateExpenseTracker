@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   TextInput,
+  Alert,
 } from 'react-native';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,6 +22,7 @@ import {
   calculateUserShare,
 } from '../../services/financeService';
 import { User } from '../../types';
+import { groupsService } from '../../services/groupsService';
 
 type RouteProps = RouteProp<RootStackParamList, 'GroupDetails'>;
 type NavProps = NativeStackNavigationProp<RootStackParamList>;
@@ -29,11 +31,13 @@ export default function GroupDetailsScreen() {
   const route = useRoute<RouteProps>();
   const navigation = useNavigation<NavProps>();
 
-  const { id } = route.params;
+  const { id, group: routeGroup } = route.params;
   
   const user = currentUser; // Simulate logged in user
-  const group = groups.find(g => g.id === id);
-  const groupExpenses = expenses.filter(e => e.groupId === id);
+  const initialGroup = groups.find(g => String(g.id) === String(id)) ?? routeGroup;
+  const [groupData, setGroupData] = useState<any>(initialGroup);
+  const group = groupData;
+  const groupExpenses = expenses.filter(e => String(e.groupId) === String(id));
 
   const [settleMember, setSettleMember] = useState<null | {
     id: string;
@@ -56,6 +60,43 @@ export default function GroupDetailsScreen() {
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
 
+  const handleUpdateGroup = async () => {
+    try {
+      const response = await groupsService.updateGroup(group?.id ?? id, {
+        name: editName,
+        emoji: selectedEmoji,
+      });
+
+      const updated = response?.data ?? response?.group ?? response ?? {};
+
+      setGroupData((prev: any) => ({
+        ...prev,
+        name: updated?.name ?? editName,
+        emoji: updated?.emoji ?? selectedEmoji,
+      }));
+
+      setShowEditModal(false);
+    } catch (error) {
+      Alert.alert(
+        'Update failed',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    try {
+      await groupsService.deleteGroup(group?.id ?? id);
+      setShowDeleteModal(false);
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert(
+        'Delete failed',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  };
+
   if (!group) {
     return (
       <View style={styles.center}>
@@ -76,7 +117,7 @@ export default function GroupDetailsScreen() {
   const memberBalances = useMemo(
     () => {
       return calculateMemberBalances(groupExpenses, currentUser).map(member => {
-        const fullMember = group.members.find(m => m.id === member.id);
+        const fullMember = group.members.find((m: any) => m.id === member.id);
         return { ...member, ...fullMember };
       });
     },
@@ -203,10 +244,7 @@ const renderAvatar = (avatar?: string | any) => {
 
         <TouchableOpacity
           style={styles.saveButton}
-          onPress={() => {
-            // update group here
-            setShowEditModal(false);
-          }}
+          onPress={handleUpdateGroup}
         >
           <Text style={styles.saveText}>Save Changes</Text>
         </TouchableOpacity>
@@ -238,10 +276,7 @@ const renderAvatar = (avatar?: string | any) => {
 
         <TouchableOpacity
           style={styles.deleteBtn}
-          onPress={() => {
-            setShowDeleteModal(false);
-            navigation.goBack();
-          }}
+          onPress={handleDeleteGroup}
         >
           <Text style={{ color: '#fff' }}>Delete</Text>
         </TouchableOpacity>
@@ -260,7 +295,7 @@ const renderAvatar = (avatar?: string | any) => {
             <Text style={styles.groupName}>{group.name}</Text>
 
             <View style={styles.avatarStack}>
-              {group.members.slice(0, 4).map((member, index) => (
+              {group.members.slice(0, 4).map((member: any, index: number) => (
                 <Image
                   key={member.id}
                   source={member.avatar}
@@ -490,7 +525,7 @@ const renderAvatar = (avatar?: string | any) => {
 </Modal>
 
   {/* Members List */}
-  {group.members.map(member => (
+  {group.members.map((member: any) => (
     <View key={member.id} style={styles.memberRow}>
       <View style={styles.memberRowLeft}>
       <Image
@@ -566,7 +601,7 @@ const renderAvatar = (avatar?: string | any) => {
             if (memberToRemove) {
               // Remove member from group
               group.members = group.members.filter(
-                m => m.id !== memberToRemove.id
+                (m: any) => m.id !== memberToRemove.id
               );
             }
 
