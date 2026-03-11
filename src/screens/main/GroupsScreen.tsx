@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,16 +6,16 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Alert,
 } from 'react-native';
-import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabParamList, RootStackParamList } from '../../types/navigation';
 import Icon from 'react-native-vector-icons/Feather';
-import { groups, expenses, currentUser } from '../../data/mockData';
-import { calculateGroupBalance } from '../../services/financeService';
-import { Dimensions } from 'react-native';
 import { Image } from 'react-native';
+import { groupsService } from '../../services/groupsService';
+import profileIcon from '../../../assets/ProfileIcon.png';
 
 type GroupsNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BottomTabParamList, 'Groups'>,
@@ -25,18 +25,108 @@ type GroupsNavigationProp = CompositeNavigationProp<
 export default function GroupsScreen() {
   const navigation = useNavigation<GroupsNavigationProp>();
 
-  // Calculate balances for all groups
-  const groupBalances = useMemo(() => {
-    return groups.map(group => ({
-      group,
-      balance: calculateGroupBalance(group.id, expenses, currentUser),
-    }));
-  }, [groups, expenses]);
+  const [groups, setGroups] = useState<any[]>([]);
 
   const [showCreate, setShowCreate] = useState(false);
-  const screenHeight = Dimensions.get('window').height;
   const [groupName, setGroupName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🏠');
+
+  const getAvatarSource = (avatar: any) => {
+    if (!avatar) {
+      return profileIcon;
+    }
+
+    return typeof avatar === 'string' ? { uri: avatar } : avatar;
+  };
+
+  const normalizeGroup = (group: any) => {
+    const membersRaw = Array.isArray(group?.members)
+      ? group.members
+      : Array.isArray(group?.users)
+      ? group.users
+      : Array.isArray(group?.participants)
+      ? group.participants
+      : [];
+
+    const members = membersRaw.map((member: any, index: number) => ({
+      id: String(member.id ),
+      name: member.name,
+      avatar: member.avatar_url || null,
+    }));
+
+    return {
+      id: String(group.id ),
+      name: group.name || 'Untitled Group',
+      emoji: group.emoji || '👥',
+      members,
+      isYouOwing: group.balance?.isYouOwing ?? false,
+      amount: group.balance?.amount ?? 0,
+    };
+  };
+
+  const loadGroups = useCallback(async () => {
+
+    try {
+
+      const data = await groupsService.getGroups();
+
+      const normalizedGroups = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data?.groups)
+            ? data.groups
+            : [];
+
+      setGroups(normalizedGroups.map(normalizeGroup));
+
+    } catch (error) {
+
+      console.log('Failed to load groups', error);
+
+      setGroups([]);
+
+    }
+
+  }, []);
+
+  useEffect(() => {
+    loadGroups();
+  }, [loadGroups]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadGroups();
+    }, [loadGroups])
+  );
+
+  const handleCreateGroup = async () => {
+
+    try {
+
+      await groupsService.createGroup({
+        name: groupName,
+        description: '',
+        emoji: selectedEmoji,
+      });
+
+      setGroupName('');
+      setShowCreate(false);
+
+      await loadGroups();
+
+    } catch (error) {
+
+      console.log('Create group failed', error);
+      
+      Alert.alert(
+        'Create group failed',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+
+    }
+
+  };
 
   const emojis: string[] = [
   '🏠','✈️','📄','🎉','🍕','🎬','⚽','🎵',
@@ -65,16 +155,16 @@ export default function GroupsScreen() {
         </View>
 
         {/* Groups List */}
-        {groupBalances.map(({ group, balance }) => {
-          const isOwing = balance.isYouOwing;
-          const amount = balance.amount;
+        {groups.map((group) => {
+          const isOwing = group.isYouOwing;
+          const amount = Number(group.amount || 0);
 
           return (
             <TouchableOpacity
               key={group.id}
               style={styles.groupCard}
               onPress={() =>
-                navigation.navigate('GroupDetails', { id: group.id })
+                navigation.navigate('GroupDetails', { id: String(group.id), group })
               }
             >
       {/* Top Section */}
@@ -87,10 +177,10 @@ export default function GroupsScreen() {
           <Text style={styles.groupName}>{group.name}</Text>
           <View style={styles.memberRow}>
             <View style={styles.avatarStack}>
-              {group.members.slice(0, 4).map((member, index) => (
+              {(group.members || []).slice(0, 4).map((member: any, index: number) => (
                 <Image
                   key={member.id}
-                  source={member.avatar}
+                  source={getAvatarSource(member.avatar)}
                   style={[
                     styles.avatar,
                     { marginLeft: index === 0 ? 0 : -10 },
@@ -100,7 +190,7 @@ export default function GroupsScreen() {
             </View>
 
             <Text style={styles.memberText}>
-              {group.members.length} members
+              {(group.members || []).length} members
             </Text>
           </View>
         </View>
@@ -128,7 +218,7 @@ export default function GroupsScreen() {
 
                   {amount === 0 ? (
                     <Text style={styles.settledText}>
-                      Settled up
+                      View group expenses
                     </Text>
                   ) : (
                     <Text
@@ -213,6 +303,7 @@ export default function GroupsScreen() {
             styles.createBtn,
             !groupName.trim() && styles.disabledBtn,
           ]}
+          onPress={handleCreateGroup}
         >
           <Icon
             name="check"
