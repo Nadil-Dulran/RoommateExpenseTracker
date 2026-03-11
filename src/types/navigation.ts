@@ -10,7 +10,7 @@ export type RootStackParamList = {
     | { mode: 'single'; memberId: string; amount: number };
 
   Notifications: undefined;
-  GroupDetails: { id: string };
+  GroupDetails: { id: string; group?: any };
 };
 
 export type BottomTabParamList = {
