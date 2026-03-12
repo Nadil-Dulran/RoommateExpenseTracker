@@ -20,7 +20,7 @@ import settingsIcon from '../../../assets/settings.png';
 import helpIcon from '../../../assets/help.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { profileService } from '../../services/profileService';
-
+import {launchImageLibrary} from 'react-native-image-picker';
 
 const currencies = [
   { code: 'USD', symbol: '$', name: 'US Dollar' },
@@ -39,6 +39,115 @@ export default function ProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [avatarMimeType, setAvatarMimeType] = useState('image/jpeg');
+  const [avatarChanged, setAvatarChanged] = useState(false);
+
+  const toImageUri = (value?: string | null, mimeType?: string) => {
+    if (!value) {
+      return null;
+    }
+
+    const normalizedValue = value.trim();
+
+    if (normalizedValue.startsWith('http://') || normalizedValue.startsWith('https://')) {
+      return normalizedValue;
+    }
+
+    if (normalizedValue.startsWith('data:image')) {
+      return normalizedValue;
+    }
+
+    const compactBase64 = normalizedValue.replace(/\s/g, '');
+
+    return `data:${mimeType || 'image/jpeg'};base64,${compactBase64}`;
+  };
+
+  const toBackendBase64 = (value?: string | null) => {
+    if (!value) {
+      return undefined;
+    }
+
+    if (value.startsWith('data:image')) {
+      const parts = value.split(',');
+      return parts.length > 1 ? parts[1] : undefined;
+    }
+
+    return value;
+  };
+
+  const showSuccessMessage = () => {
+    setShowSuccessToast(true);
+    setTimeout(() => {
+      setShowSuccessToast(false);
+    }, 2200);
+  };
+
+  const pickImage = async () => {
+    const previousAvatar = avatar;
+
+    const response = await launchImageLibrary({
+      mediaType: 'photo',
+      includeBase64: true,
+      selectionLimit: 1,
+      quality: 0.6,
+      maxWidth: 1024,
+      maxHeight: 1024,
+    });
+
+    if (response.didCancel) {
+      return;
+    }
+
+    if (response.errorCode) {
+      Alert.alert('Image selection failed', response.errorMessage || 'Please try again.');
+      return;
+    }
+
+    const selectedAsset = response.assets?.[0];
+
+    if (!selectedAsset?.base64) {
+      Alert.alert('Image selection failed', 'Could not read selected image.');
+      return;
+    }
+
+    const rawBase64 = selectedAsset.base64;
+    const selectedMimeType = selectedAsset.type || 'image/jpeg';
+    const previewUri = toImageUri(rawBase64, selectedMimeType) || '';
+
+    setAvatar(previewUri);
+    setAvatarMimeType(selectedMimeType);
+    setAvatarChanged(true);
+
+    try {
+      setIsSaving(true);
+
+      const updated = await profileService.updateProfile({
+        name,
+        email,
+        phone,
+        currency: selectedCurrency.code,
+        avatarBase64: rawBase64,
+      });
+
+      setAvatar(toImageUri(updated.avatarBase64, selectedMimeType) || previewUri);
+      setAvatarChanged(false);
+      showSuccessMessage();
+    } catch (error) {
+      console.log('Avatar update failed', error);
+      setAvatar(previousAvatar);
+      setAvatarChanged(false);
+
+      if (error instanceof Error && error.message === 'No auth token found') {
+        Alert.alert('Session expired', 'Please login again.');
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Avatar update failed', error instanceof Error ? error.message : 'Unknown error');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -55,6 +164,8 @@ export default function ProfileScreen() {
 
       const data = await profileService.getProfile();
 
+      setAvatar(toImageUri(data.avatarBase64, avatarMimeType));
+      setAvatarChanged(false);
       setName(data.name || '');
       setEmail(data.email || '');
       setPhone(data.phone || '');
@@ -87,11 +198,10 @@ export default function ProfileScreen() {
         email,
         phone,
         currency: selectedCurrency.code,
+        ...(avatarChanged && avatar ? { avatarBase64: toBackendBase64(avatar) } : {}),
       });
-      setShowSuccessToast(true);
-      setTimeout(() => {
-        setShowSuccessToast(false);
-      }, 2200);
+      setAvatarChanged(false);
+      showSuccessMessage();
     } catch (error) {
       console.log('Update failed', error);
 
@@ -132,12 +242,15 @@ export default function ProfileScreen() {
         <View style={styles.imageSection}>
           <View style={styles.avatarWrapper}>
             <Image
-              source={profileIcon}
+              source={avatar ? { uri: avatar } : profileIcon}
               style={styles.avatar}
             />
             <TouchableOpacity
               style={styles.cameraButton}
-              onPress={() => Alert.alert('Change photo', 'Profile photo update coming soon.')}
+              onPress={() => {
+                void pickImage();
+              }}
+              disabled={isSaving}
             >
               <Icon name="camera" size={16} color="#fff" />
             </TouchableOpacity>
