@@ -45,3 +45,14 @@ Roommate Expense Tracker is a cross-platform mobile app (Android & iOS) that sol
 | @react-native-async-storage | 3.x | Local auth token storage |
 | @react-native-community/datetimepicker | 8.x | Date/time input for expenses |
 
+### Backend (separate repository)
+
+| Technology | Purpose |
+|---|---|
+| Node.js + TypeScript | REST API server |
+| Express.js | HTTP routing |
+| MySQL | Relational database (users, groups, expenses, avatars) |
+| Sequelize ORM | Database models and queries |
+| JWT | Authentication tokens |
+
+---
