@@ -106,3 +106,15 @@ RoommateExpenseTracker/
 ```
 
 ---
+
+## Running the App in VS Code with Android Emulator
+
+### Prerequisites
+
+Make sure the following are installed and configured:
+
+- [Node.js](https://nodejs.org/) v20 or later
+- [Android Studio](https://developer.android.com/studio) with an Android Virtual Device (AVD) set up
+- Java Development Kit (JDK 17 recommended)
+- React Native environment — follow the [official setup guide](https://reactnative.dev/docs/set-up-your-environment) for your OS
+
