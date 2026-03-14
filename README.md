@@ -56,3 +56,53 @@ Roommate Expense Tracker is a cross-platform mobile app (Android & iOS) that sol
 | JWT | Authentication tokens |
 
 ---
+
+## Project Structure
+
+```
+RoommateExpenseTracker/
+├── App.tsx                          # App entry point
+├── index.js                         # React Native entry
+├── src/
+│   ├── data/
+│   │   └── mockData.ts              # Temporary mock data (replaced progressively by API)
+│   ├── navigation/
+│   │   ├── AppNavigator.tsx         # Root navigator (auth vs main flow)
+│   │   └── BottomTabs.tsx           # Main tab bar (Dashboard, Groups, Expenses, Activity, Profile)
+│   ├── screens/
+│   │   ├── authentication/
+│   │   │   ├── LoginScreen.tsx
+│   │   │   ├── SignupScreen.tsx
+│   │   │   └── ForgetPasswordScreen.tsx
+│   │   ├── main/
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── GroupsScreen.tsx
+│   │   │   ├── ExpensesScreen.tsx
+│   │   │   ├── ActivityScreen.tsx
+│   │   │   └── AddExpensScreen.tsx
+│   │   ├── external/
+│   │   │   ├── GroupDetailsScreen.tsx
+│   │   │   ├── NotificationScreen.tsx
+│   │   │   └── SettleUpScreen.tsx
+│   │   └── profile/
+│   │       └── ProfileSettings.tsx
+│   ├── services/                    # All backend API calls
+│   │   ├── api.ts                   # Shared base URL config
+│   │   ├── authService.ts           # Login, register
+│   │   ├── profileService.ts        # Profile CRUD + avatar upload
+│   │   ├── expenseService.ts        # Expense CRUD
+│   │   ├── financeService.ts        # Balance/settle calculations
+│   │   └── groupMembersService.ts   # Group member management
+│   └── types/
+│       ├── navigation.ts            # Navigation param types
+│       ├── expense.ts
+│       ├── group.ts
+│       ├── user.ts
+│       └── notification.ts
+├── assets/
+│   └── fonts/                       # Custom fonts
+├── android/                         # Android native project
+└── ios/                             # iOS native project
+```
+
+---
