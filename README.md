@@ -175,3 +175,14 @@ The app builds and launches on the running emulator automatically.
 
 - Press `R` twice in the Metro terminal, **or**
 - Press `Ctrl + M` inside the emulator and tap **Reload**
+
+---
+
+## Development Notes
+
+- `src/services/api.ts` — change the base URL here if your network address differs from the default.
+- `src/data/mockData.ts` — placeholder data for screens not yet wired to the backend. Removed progressively as backend endpoints are completed.
+- Avatar images are stored as raw Base64 in the `avatarBase64` MySQL column and decoded back to a `data:image` URI for display in the app.
+- Auth token is stored in `AsyncStorage` and sent as a `Bearer` token on every API request.
+
+---
