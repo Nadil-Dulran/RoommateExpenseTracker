@@ -118,3 +118,60 @@ Make sure the following are installed and configured:
 - Java Development Kit (JDK 17 recommended)
 - React Native environment — follow the [official setup guide](https://reactnative.dev/docs/set-up-your-environment) for your OS
 
+### Step 1 — Clone and install dependencies
+
+```sh
+git clone <this-repo-url>
+cd RoommateExpenseTracker
+npm install
+```
+
+### Step 2 — Start the backend
+
+Clone the backend repo and start the API server so it is reachable at `http://localhost:3000`:
+
+```sh
+git clone https://github.com/Nadil-Dulran/RMT_Backend.git
+cd RMT_Backend
+npm install
+npm run dev
+```
+
+Make sure your MySQL database is running and the backend is connected before starting the app.
+
+### Step 3 — Start the Android Emulator
+
+1. Open **Android Studio**
+2. Go to **Device Manager** and start your AVD
+3. Wait until the emulator is fully booted
+
+> The app connects to the backend using `http://10.0.2.2:3000/api` — this is the Android emulator's built-in alias for `localhost` on your host machine.
+
+### Step 4 — Open the project in VS Code
+
+```sh
+code .
+```
+
+### Step 5 — Start Metro bundler
+
+Open a terminal in VS Code and run:
+
+```sh
+npm start
+```
+
+### Step 6 — Run on Android
+
+Open a **second terminal** in VS Code and run:
+
+```sh
+npm run android
+```
+
+The app builds and launches on the running emulator automatically.
+
+### Reloading after changes
+
+- Press `R` twice in the Metro terminal, **or**
+- Press `Ctrl + M` inside the emulator and tap **Reload**
