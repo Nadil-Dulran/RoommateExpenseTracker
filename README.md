@@ -186,3 +186,14 @@ The app builds and launches on the running emulator automatically.
 - Auth token is stored in `AsyncStorage` and sent as a `Bearer` token on every API request.
 
 ---
+
+## Deployment Plan
+
+Deployment is planned once backend development is complete. Target platforms:
+
+- **Android** — Google Play Store
+- **iOS** — Apple App Store
+
+The backend will be deployed to a cloud hosting provider with a production MySQL database.
+
+---
