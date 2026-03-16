@@ -204,3 +204,5 @@ The backend will be deployed to a cloud hosting provider with a production MySQL
 **Nadil Dulran**
 Intern Full Stack Software Engineer at **Akvasoft (PVT) LTD**
 
+This project was built as part of an internship at Akvasoft (PVT) LTD, covering both the React Native frontend and the Node.js/TypeScript backend.
+
