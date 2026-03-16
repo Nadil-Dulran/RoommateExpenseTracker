@@ -197,3 +197,10 @@ Deployment is planned once backend development is complete. Target platforms:
 The backend will be deployed to a cloud hosting provider with a production MySQL database.
 
 ---
+
+
+## Author
+
+**Nadil Dulran**
+Intern Full Stack Software Engineer at **Akvasoft (PVT) LTD**
+
