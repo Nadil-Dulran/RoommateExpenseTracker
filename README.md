@@ -206,3 +206,5 @@ Intern Full Stack Software Engineer at **Akvasoft (PVT) LTD**
 
 This project was built as part of an internship at Akvasoft (PVT) LTD, covering both the React Native frontend and the Node.js/TypeScript backend.
 
+- Frontend: this repository
+- Backend: [github.com/Nadil-Dulran/RMT_Backend](https://github.com/Nadil-Dulran/RMT_Backend)
