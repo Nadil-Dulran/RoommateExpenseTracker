@@ -58,6 +58,9 @@ export default function LoginScreen() {
     if (result.success) {
 
       await AsyncStorage.setItem('token', result.token);
+      if (result?.user?.id != null) {
+        await AsyncStorage.setItem('userId', String(result.user.id));
+      }
 
       navigation.navigate('MainTabs');
 
