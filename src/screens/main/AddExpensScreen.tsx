@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,24 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Feather';
-import { categories, groups, currentUser } from '../../data/mockData';
-import { User, Group, CategoryType } from '../../types';
+import { categories } from '../../data/mockData';
+import { CategoryType } from '../../types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
+import { expensesService } from '../../services/expensesService';
+import { groupsService } from '../../services/groupsService';
+import { groupMembersService } from '../../services/groupMembersService';
+import { profileService } from '../../services/profileService';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabParamList, RootStackParamList } from '../../types/navigation';
+import profileIcon from '../../../assets/ProfileIcon.png';
 
 
 type DashboardNavigationProp = CompositeNavigationProp<
@@ -26,21 +34,168 @@ type DashboardNavigationProp = CompositeNavigationProp<
 
 export default function AddExpenseScreen() {
  const navigation = useNavigation<DashboardNavigationProp>();
-  
+
+  // ── backend data ──────────────────────────────────────────────────
+  const [backendGroups, setBackendGroups] = useState<any[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserAvatarUri, setCurrentUserAvatarUri] = useState<string | null>(null);
+
+  const toImageUri = (value?: string | null, mimeType?: string) => {
+    if (!value) {
+      return null;
+    }
+
+    const normalizedValue = String(value).trim();
+
+    if (normalizedValue.startsWith('http://') || normalizedValue.startsWith('https://')) {
+      return normalizedValue;
+    }
+
+    if (normalizedValue.startsWith('data:image')) {
+      return normalizedValue;
+    }
+
+    const compactBase64 = normalizedValue.replace(/\s/g, '');
+
+    return `data:${mimeType || 'image/jpeg'};base64,${compactBase64}`;
+  };
+
+  const normalizeMembers = (raw: any[]) =>
+    (raw || []).map((m: any, i: number) => ({
+      id: String(m.id ?? `member-${i}`),
+      name: m.name ?? 'Member',
+      avatarUri: toImageUri(
+        m.avatar ??
+        m.avatarBase64 ??
+        m.avatar_base64 ??
+        m.avatarbase64 ??
+        m.avatar_url ??
+        m.avatarUrl ??
+        m.profileImage ??
+        m.user?.avatarBase64 ??
+        m.user?.avatar_base64 ??
+        m.profile?.avatarBase64 ??
+        m.profile?.avatar_base64 ??
+        m.dataValues?.avatarBase64 ??
+        m.dataValues?.avatar_base64 ??
+        null,
+        m.avatarMimeType ?? m.avatar_mime_type ?? 'image/jpeg'
+      ),
+    }));
+
+  useEffect(() => {
+    const loadCurrentUserAvatar = async () => {
+      try {
+        const storedId = await AsyncStorage.getItem('userId');
+        if (storedId) {
+          setCurrentUserId(String(storedId));
+        }
+
+        const profile = await profileService.getProfile();
+        const avatarUri = toImageUri(profile.avatarBase64 ?? null);
+
+        if (avatarUri) {
+          setCurrentUserAvatarUri(avatarUri);
+        }
+      } catch (_error) {
+        setCurrentUserAvatarUri(null);
+      }
+    };
+
+    loadCurrentUserAvatar();
+  }, []);
+
+  const extractMembersPayload = (data: any): any[] => {
+    if (Array.isArray(data)) { return data; }
+    if (Array.isArray(data?.data)) { return data.data; }
+    if (Array.isArray(data?.members)) { return data.members; }
+    return [];
+  };
+
+  const normalizeGroup = (g: any) => ({
+    id: String(g.id),
+    name: g.name || 'Untitled Group',
+    emoji: g.emoji || '👥',
+    members: normalizeMembers(
+      Array.isArray(g?.members) ? g.members
+      : Array.isArray(g?.users) ? g.users
+      : []
+    ),
+  });
+
+  const loadGroups = useCallback(async () => {
+    setLoadingGroups(true);
+    try {
+      const data = await groupsService.getGroups();
+      const raw: any[] = Array.isArray(data) ? data
+        : Array.isArray(data?.data) ? data.data
+        : Array.isArray(data?.groups) ? data.groups
+        : [];
+
+      const base = raw.map(normalizeGroup);
+
+      const withMembers = await Promise.all(
+        base.map(async (group: any) => {
+          try {
+            const membersRes = await groupMembersService.getMembers(group.id);
+            const members = normalizeMembers(extractMembersPayload(membersRes)).map((member: any) => {
+              if (
+                !member.avatarUri &&
+                currentUserAvatarUri &&
+                currentUserId &&
+                String(member.id) === String(currentUserId)
+              ) {
+                return {
+                  ...member,
+                  avatarUri: currentUserAvatarUri,
+                };
+              }
+
+              return member;
+            });
+            return { ...group, members: members.length > 0 ? members : group.members };
+          } catch (_e) {
+            return group;
+          }
+        })
+      );
+
+      setBackendGroups(withMembers);
+
+      if (withMembers.length > 0) {
+        setSelectedGroup(withMembers[0]);
+        // pre-select current user as paidBy if we can match by stored userId
+        const storedId = await AsyncStorage.getItem('userId');
+        const firstGroup = withMembers[0];
+        const matchedUser = storedId
+          ? firstGroup.members.find((m: any) => String(m.id) === String(storedId))
+          : null;
+        setPaidBy(matchedUser ?? firstGroup.members[0] ?? null);
+      }
+    } catch (e) {
+      console.log('Failed to load groups', e);
+    } finally {
+      setLoadingGroups(false);
+    }
+  }, [currentUserAvatarUri, currentUserId]);
+
+  useEffect(() => { loadGroups(); }, [loadGroups]);
+
+  // ── form state ────────────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
-
 
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryType>('food');
-  const [selectedGroup, setSelectedGroup] =
-    useState<Group>(groups[0]);
-  const [paidBy, setPaidBy] =
-    useState<User>(currentUser);
+  const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
+  const [paidBy, setPaidBy] = useState<any | null>(null);
   const [splitType, setSplitType] =
     useState<'equal' | 'exact' | 'percentage'>('equal');
+
+  const selectedCategoryMeta = categories[selectedCategory];
 
   const [exactAmounts, setExactAmounts] =
     useState<Record<string, string>>({});
@@ -48,9 +203,11 @@ export default function AddExpenseScreen() {
   const [percentages, setPercentages] =
     useState<Record<string, string>>({});
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Equal split
   const splitAmount = useMemo(() => {
-    if (!amount) return '0.00';
+    if (!amount || !selectedGroup?.members?.length) { return '0.00'; }
     return (
       parseFloat(amount) /
       selectedGroup.members.length
@@ -158,29 +315,42 @@ export default function AddExpenseScreen() {
 
         {/* Group */}
         <Text style={styles.label}>Group</Text>
-        {groups.map(group => (
-          <TouchableOpacity
-            key={group.id}
-            onPress={() => setSelectedGroup(group)}
-            style={[
-              styles.groupCard,
-              selectedGroup.id === group.id &&
-                styles.selectedGroupCard,
-            ]}
-          >
-            <Text style={styles.groupEmoji}>
-              {group.emoji}
-            </Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.groupName}>
-                {group.name}
+        {loadingGroups ? (
+          <ActivityIndicator color="#009966" style={{ marginVertical: 12 }} />
+        ) : backendGroups.length === 0 ? (
+          <Text style={{ color: '#98A2B3', marginBottom: 8 }}>No groups found</Text>
+        ) : (
+          backendGroups.map(group => (
+            <TouchableOpacity
+              key={group.id}
+              onPress={async () => {
+                setSelectedGroup(group);
+                const storedId = await AsyncStorage.getItem('userId');
+                const matchedUser = storedId
+                  ? group.members.find((m: any) => String(m.id) === String(storedId))
+                  : null;
+                setPaidBy(matchedUser ?? group.members[0] ?? null);
+              }}
+              style={[
+                styles.groupCard,
+                selectedGroup?.id === group.id &&
+                  styles.selectedGroupCard,
+              ]}
+            >
+              <Text style={styles.groupEmoji}>
+                {group.emoji}
               </Text>
-              <Text style={styles.groupMembers}>
-                {group.members.length} members
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.groupName}>
+                  {group.name}
+                </Text>
+                <Text style={styles.groupMembers}>
+                  {group.members.length} members
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
         
         {/* Select Date */}
 
@@ -215,18 +385,22 @@ export default function AddExpenseScreen() {
  
         {/* Paid By */}
         <Text style={styles.label}>Paid By</Text>
-        {selectedGroup.members.map(member => (
+        {(selectedGroup?.members ?? []).map((member: any) => (
           <TouchableOpacity
             key={member.id}
             onPress={() => setPaidBy(member)}
             style={[
               styles.paidItem,
-              paidBy.id === member.id &&
+              paidBy?.id === member.id &&
                 styles.selectedGroupCard,
             ]}
           >
             <Image
-              source={member.avatar}
+              source={
+                member.avatarUri
+                  ? { uri: member.avatarUri }
+                  : profileIcon
+              }
               style={styles.avatar}
             />
             <Text style={styles.memberName}>
@@ -272,7 +446,7 @@ export default function AddExpenseScreen() {
         {/* Equal */}
         {splitType === 'equal' && (
           <View style={styles.splitBox}>
-            {selectedGroup.members.map(m => (
+            {(selectedGroup?.members ?? []).map((m: any) => (
               <View
                 key={m.id}
                 style={styles.splitRowItem}
@@ -287,7 +461,7 @@ export default function AddExpenseScreen() {
         {/* Exact */}
         {splitType === 'exact' && (
           <View style={styles.splitBox}>
-            {selectedGroup.members.map(m => (
+            {(selectedGroup?.members ?? []).map((m: any) => (
               <View
                 key={m.id}
                 style={styles.splitRowItem}
@@ -327,7 +501,7 @@ export default function AddExpenseScreen() {
         {/* Percentage */}
         {splitType === 'percentage' && (
           <View style={styles.splitBox}>
-            {selectedGroup.members.map(m => (
+            {(selectedGroup?.members ?? []).map((m: any) => (
               <View
                 key={m.id}
                 style={styles.splitRowItem}
@@ -370,16 +544,56 @@ export default function AddExpenseScreen() {
 
         {/* Submit */}
         <TouchableOpacity
-          disabled={!amount || !description}
+          disabled={!amount || !description || isSubmitting || !selectedGroup || !paidBy}
           style={[
             styles.submitBtn,
-            (!amount || !description) && {
+            (!amount || !description || isSubmitting || !selectedGroup || !paidBy) && {
               backgroundColor: '#99A1AF',
             },
           ]}
+          onPress={async () => {
+            if (!selectedGroup || !paidBy) { return; }
+            setIsSubmitting(true);
+            try {
+              const members: any[] = selectedGroup.members ?? [];
+              const splits =
+                splitType === 'equal'
+                  ? members.map((m: any) => ({
+                      userId: m.id,
+                      amount: parseFloat(splitAmount),
+                    }))
+                  : splitType === 'exact'
+                  ? members.map((m: any) => ({
+                      userId: m.id,
+                      amount: parseFloat(exactAmounts[m.id] || '0'),
+                    }))
+                  : members.map((m: any) => ({
+                      userId: m.id,
+                      percentage: parseFloat(percentages[m.id] || '0'),
+                      amount: parseFloat(getPercentageAmount(percentages[m.id])),
+                    }));
+
+              await expensesService.createExpense({
+                description,
+                amount: parseFloat(amount),
+                category: selectedCategoryMeta.icon,
+                groupId: parseInt(selectedGroup.id, 10),
+                paidById: paidBy.id,
+                date: selectedDate.toISOString().split('T')[0],
+                splitType,
+                splits,
+              });
+
+              navigation.navigate('Expenses');
+            } catch (err: any) {
+              Alert.alert('Failed to create expense', err?.message ?? 'Unknown error');
+            } finally {
+              setIsSubmitting(false);
+            }
+          }}
         >
           <Text style={styles.submitText}>
-            Add Expense
+            {isSubmitting ? 'Saving...' : 'Add Expense'}
           </Text>
         </TouchableOpacity>
 
