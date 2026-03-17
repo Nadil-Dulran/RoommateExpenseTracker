@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,11 @@ import {
   Pressable,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Expense } from '../../types';
-import { groups, currentUser } from '../../data/mockData';
-import { expenseService } from '../../services/expenseService';
+import { groups, currentUser, categories } from '../../data/mockData';
+import { expensesService } from '../../services/expensesService';
+import { groupsService } from '../../services/groupsService';
 import { Image } from 'react-native';
 import deleteIcon from '../../../assets/delete.png';
 import editIcon from '../../../assets/edit.png';
@@ -22,6 +24,7 @@ export default function ExpensesScreen() {
   const navigation = useNavigation<any>();
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [backendGroups, setBackendGroups] = useState<any[]>([]);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -56,59 +59,217 @@ const handleDelete = (item: Expense) => {
   setShowDeleteModal(true);
 };
 
+  const getCategoryEmoji = (categoryValue: unknown) => {
+    if (!categoryValue) {
+      return categories.other.icon;
+    }
+
+    const value = String(categoryValue).trim();
+
+    const directEmojiMatch = Object.values(categories).find(
+      category => category.icon === value
+    );
+
+    if (directEmojiMatch) {
+      return directEmojiMatch.icon;
+    }
+
+    const normalized = value.toLowerCase();
+    const keyOrNameMatch = Object.entries(categories).find(
+      ([key, category]) =>
+        key.toLowerCase() === normalized ||
+        category.name.toLowerCase() === normalized
+    );
+
+    return keyOrNameMatch?.[1].icon ?? value;
+  };
+
+  const normalizeGroupInfo = (group: any) => ({
+    id: String(group?.id ?? ''),
+    name: group?.name || 'Untitled Group',
+    emoji: group?.emoji || '👥',
+    members: Array.isArray(group?.members) ? group.members : [],
+  });
+
+  const normalizeExpense = (raw: any): Expense => {
+    const splitsRaw = Array.isArray(raw?.splits)
+      ? raw.splits
+      : Array.isArray(raw?.splitDetails)
+      ? raw.splitDetails
+      : Array.isArray(raw?.split_details)
+      ? raw.split_details
+      : Array.isArray(raw?.members)
+      ? raw.members
+      : [];
+
+    const paidById = String(
+      raw?.paidBy?.id ??
+      raw?.paidById ??
+      raw?.paid_by ??
+      raw?.paid_by_id ??
+      raw?.userId ??
+      raw?.user_id ??
+      ''
+    );
+
+    return {
+      id: String(raw?.id ?? raw?.expenseId ?? raw?.expense_id ?? ''),
+      category: (raw?.categoryEmoji ?? raw?.category_emoji ?? raw?.category ?? raw?.type ?? 'other') as Expense['category'],
+      description: raw?.description ?? raw?.title ?? 'Expense',
+      amount: Number(raw?.amount ?? raw?.total ?? raw?.expense_amount ?? 0),
+      date: String(raw?.date ?? raw?.createdAt ?? raw?.created_at ?? new Date().toISOString()),
+      groupId: String(raw?.groupId ?? raw?.group_id ?? raw?.group?.id ?? ''),
+      paidBy: {
+        id: paidById,
+        name:
+          raw?.paidBy?.name ??
+          raw?.paidByName ??
+          raw?.paid_by_name ??
+          raw?.payer_name ??
+          'Unknown',
+      },
+      splits: splitsRaw.map((split: any) => ({
+        userId: String(split?.userId ?? split?.user_id ?? split?.memberId ?? split?.member_id ?? split?.id ?? ''),
+        amount: Number(split?.amount ?? split?.share ?? split?.split_amount ?? 0),
+      })),
+    };
+  };
+
   const getGroupInfo = (groupId: string) =>
-    groups.find(g => g.id === groupId);
+    backendGroups.find(g => String(g.id) === String(groupId)) ||
+    groups.find(g => String(g.id) === String(groupId));
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString();
   };
 
+  const loadGroups = useCallback(async () => {
+    try {
+      const groupsResponse = await groupsService.getGroups();
+      const groupList: any[] = Array.isArray(groupsResponse)
+        ? groupsResponse
+        : Array.isArray(groupsResponse?.data)
+        ? groupsResponse.data
+        : Array.isArray(groupsResponse?.groups)
+        ? groupsResponse.groups
+        : [];
+
+      setBackendGroups(groupList.map(normalizeGroupInfo));
+    } catch (error) {
+      console.log('Failed to load groups for expenses', error);
+      setBackendGroups([]);
+    }
+  }, []);
+
+  const loadExpenses = useCallback(async () => {
+    const loadByGroups = async () => {
+      const groupsResponse = await groupsService.getGroups();
+      const groupList: any[] = Array.isArray(groupsResponse)
+        ? groupsResponse
+        : Array.isArray(groupsResponse?.data)
+        ? groupsResponse.data
+        : Array.isArray(groupsResponse?.groups)
+        ? groupsResponse.groups
+        : [];
+
+      const groupedExpenses = await Promise.all(
+        groupList.map(async (group: any) => {
+          const groupId = Number(group?.id);
+          if (!Number.isFinite(groupId)) {
+            return [];
+          }
+
+          try {
+            return await expensesService.getExpenses(groupId);
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      const flat = groupedExpenses.flat();
+      const uniqueById = new Map<string, any>();
+
+      flat.forEach(item => {
+        const key = String(item?.id ?? item?.expenseId ?? item?.expense_id ?? '');
+        if (key) {
+          uniqueById.set(key, item);
+        }
+      });
+
+      return Array.from(uniqueById.values());
+    };
+
+    try {
+      const data = await expensesService.getExpenses();
+      const directList = Array.isArray(data) ? data : [];
+      const fallbackList = directList.length > 0 ? [] : await loadByGroups();
+
+      const normalized = (directList.length > 0 ? directList : fallbackList)
+        .map(normalizeExpense)
+        .filter(item => !!item.id);
+
+      setExpenses(normalized);
+    } catch (e) {
+      console.log('Failed to load expenses', e);
+      try {
+        const fallbackList = await loadByGroups();
+        const normalized = fallbackList
+          .map(normalizeExpense)
+          .filter(item => !!item.id);
+        setExpenses(normalized);
+      } catch (fallbackError) {
+        console.log('Failed to load expenses by groups', fallbackError);
+        setExpenses([]);
+      }
+    }
+  }, []);
+
   useEffect(() => {
-  const loadExpenses = async () => {
-    const data = await expenseService.getExpenses();
-    setExpenses(data);
-  };
+    loadGroups();
+    loadExpenses();
+  }, [loadExpenses, loadGroups]);
 
-  loadExpenses();
-}, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadGroups();
+      loadExpenses();
+    }, [loadExpenses, loadGroups])
+  );
 
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!selectedExpense) return;
 
-    setExpenses(prev =>
-      prev.filter(exp => exp.id !== selectedExpense.id)
-    );
+    await expensesService.deleteExpense(parseInt(selectedExpense.id, 10));
 
     setSelectedExpense(null);
     setShowDeleteModal(false);
+    await loadExpenses();
   };
 
-  const confirmEdit = () => {
+  const confirmEdit = async () => {
     if (!selectedExpense) return;
 
-    setExpenses(prev =>
-      prev.map(exp =>
-        exp.id === selectedExpense.id
-          ? {
-              ...exp,
-              description: editDescription,
-              amount: parseFloat(editAmount),
-            }
-          : exp
-      )
-    );
+    await expensesService.updateExpense(parseInt(selectedExpense.id, 10), {
+      description: editDescription,
+      amount: parseFloat(editAmount),
+    });
 
     setShowEditModal(false);
     setSelectedExpense(null);
+    await loadExpenses();
   };
 
 
   const renderExpense = ({ item }: { item: Expense }) => {
+  const splits = Array.isArray(item.splits) ? item.splits : [];
+  const paidBy = item.paidBy ?? { id: '', name: 'Unknown' };
   const group = getGroupInfo(item.groupId);
-  const myShare = item.splits.find(s => s.userId === currentUser.id);
-  const isMyExpense = item.paidBy.id === currentUser.id;
+  const categoryEmoji = getCategoryEmoji(item.category);
+  const myShare = splits.find(s => String(s.userId) === String(currentUser.id));
+  const isMyExpense = String(paidBy.id) === String(currentUser.id);
 
   const amountOwed = isMyExpense
     ? item.amount - (myShare?.amount || 0)
@@ -118,7 +279,7 @@ return (
   <View style={styles.card}>
     {/* Top Row */}
 <View style={styles.topRow}>
-  <Text style={styles.title}>{item.description}</Text>
+  <Text style={styles.title}> {item.description} {categoryEmoji}</Text>
 
   <View style={styles.amountRow}>
     <Text style={styles.amount}>
@@ -143,12 +304,12 @@ return (
            <Pressable
             onPress={() => {
               setActiveMenuId(null);
-               const yourSplit = item.splits.find(
-               split => split.userId === currentUser.id
+               const yourSplit = splits.find(
+               split => String(split.userId) === String(currentUser.id)
               );
               navigation.navigate('SettleUp', {
                               mode: 'single',
-                              memberId: item.paidBy.id,
+                              memberId: paidBy.id,
                               amount:  yourSplit?.amount ?? 0,
                              });
             }}
@@ -200,7 +361,7 @@ return (
     {/* Paid + Owed */}
     <View style={styles.paidRow}>
       <Text style={styles.metaLight}>Paid by </Text>
-      <Text style={styles.bold}>{item.paidBy.name}</Text>
+      <Text style={styles.bold}>{paidBy.name}</Text>
 
       <Text style={styles.metaLight}>  •  </Text>
 
@@ -225,16 +386,16 @@ return (
 <View style={styles.splitRow}>
   <Text style={styles.metaLight}>Split:</Text>
 
-  {item.splits.map(split => {
+  {splits.map(split => {
     let memberName = 'Unknown';
 
-    if (split.userId === currentUser.id) {
+    if (String(split.userId) === String(currentUser.id)) {
       memberName = 'You';
-    } else if (split.userId === item.paidBy.id) {
-      memberName = item.paidBy.name;
+    } else if (String(split.userId) === String(paidBy.id)) {
+      memberName = paidBy.name;
     } else {
       const member = group?.members.find(
-        m => m.id === split.userId
+        m => String(m.id) === String(split.userId)
       );
       memberName = member?.name ?? 'Unknown';
     }
@@ -263,7 +424,7 @@ return (
 
 <FlatList
   data={expenses}
-  keyExtractor={item => item.id}
+  keyExtractor={item => String(item.id)}
   renderItem={renderExpense}
   contentContainerStyle={{ paddingBottom: 100 }}
   onScrollBeginDrag={() => setActiveMenuId(null)}
