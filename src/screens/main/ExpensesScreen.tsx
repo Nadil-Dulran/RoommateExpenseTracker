@@ -276,7 +276,7 @@ const handleDelete = (item: Expense) => {
     : 0;
 
 return (
-  <View style={styles.card}>
+  <View style={[styles.card,  activeMenuId === item.id && { zIndex: 999 } ]}>
     {/* Top Row */}
 <View style={styles.topRow}>
   <Text style={styles.title}> {item.description}</Text>
@@ -415,18 +415,22 @@ return (
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>All Expenses</Text>
+       <Text style={styles.header}>All Expenses</Text>
       <Text style={styles.subHeader}>
         {expenses.length} total
       </Text>
-
+      
 <View style={{ flex: 1 }}>
 
 <FlatList
   data={expenses}
   keyExtractor={item => String(item.id)}
   renderItem={renderExpense}
- 
+  ListHeaderComponent={
+    <>
+     {/* Add header content here */ }
+    </>
+  }
   contentContainerStyle={{
     paddingHorizontal: 2,
     paddingBottom: 100,
@@ -634,9 +638,9 @@ card: {
   marginBottom: 16,
 
   shadowColor: '#000',
-  shadowOpacity: 0.08,
-  elevation: 2,
-  overflow: 'visible', 
+  shadowOpacity: 0.01,
+  elevation: 1,
+  overflow: 'visible',  
 },
 title: {
   fontSize: 16,
