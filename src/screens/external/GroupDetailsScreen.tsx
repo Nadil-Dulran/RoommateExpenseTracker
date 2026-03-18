@@ -61,17 +61,49 @@ export default function GroupDetailsScreen() {
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
 
+  const toImageUri = (value?: string | null, mimeType?: string | null) => {
+    if (!value) {
+      return null;
+    }
+
+    const normalizedValue = String(value).trim();
+
+    if (!normalizedValue) {
+      return null;
+    }
+
+    if (normalizedValue.startsWith('http://') || normalizedValue.startsWith('https://')) {
+      return normalizedValue;
+    }
+
+    if (normalizedValue.startsWith('data:image')) {
+      return normalizedValue;
+    }
+
+    const compactBase64 = normalizedValue.replace(/\s/g, '');
+    const normalizedMime = mimeType?.trim() || 'image/jpeg';
+
+    return `data:${normalizedMime};base64,${compactBase64}`;
+  };
+
   const normalizeMembers = (membersRaw: any[]) => {
-    return (membersRaw || []).map((member: any, index: number) => ({
-      id: String(member?.id ?? member?._id ?? member?.userId ?? `member-${index}`),
-      name: member?.name ?? member?.fullName ?? 'Member',
-      avatar:
-        member?.avatar ??
-        member?.avatar_url ??
-        member?.avatarUrl ??
-        member?.profileImage ??
-        null,
-    }));
+    return (membersRaw || []).map((member: any, index: number) => {
+      const source = member?.user ?? member?.profile ?? member?.dataValues ?? member;
+
+      return {
+        id: String(
+          member?.id ??
+          `member-${index}`
+        ),
+        name:
+          member?.name ??
+          'Member',
+        avatar: toImageUri(
+          member?.avatarBase64,
+          null
+        )
+      };
+    });
   };
 
   const extractMembersPayload = (data: any) => {
