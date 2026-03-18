@@ -279,7 +279,7 @@ return (
   <View style={styles.card}>
     {/* Top Row */}
 <View style={styles.topRow}>
-  <Text style={styles.title}> {item.description} {categoryEmoji}</Text>
+  <Text style={styles.title}> {item.description}</Text>
 
   <View style={styles.amountRow}>
     <Text style={styles.amount}>
@@ -395,7 +395,7 @@ return (
       memberName = paidBy.name;
     } else {
       const member = group?.members.find(
-        m => String(m.id) === String(split.userId)
+        (member: any) => String(member.id) === String(split.userId)
       );
       memberName = member?.name ?? 'Unknown';
     }
@@ -426,8 +426,14 @@ return (
   data={expenses}
   keyExtractor={item => String(item.id)}
   renderItem={renderExpense}
-  contentContainerStyle={{ paddingBottom: 100 }}
+ 
+  contentContainerStyle={{
+    paddingHorizontal: 2,
+    paddingBottom: 100,
+    paddingTop: 2,
+  }}
   onScrollBeginDrag={() => setActiveMenuId(null)}
+  showsVerticalScrollIndicator={false} 
 />
 
 
@@ -447,7 +453,6 @@ return (
         </Pressable>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* Description */}
         <Text style={styles.label}>Description</Text>
@@ -542,7 +547,6 @@ return (
           </View>
         )}
 
-      </ScrollView>
 
       {/* Buttons */}
       <View style={styles.modalActions}>
@@ -610,7 +614,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingTop: 20,
   },
   header: {
@@ -626,12 +630,12 @@ const styles = StyleSheet.create({
 card: {
   backgroundColor: '#FFFFFF',
   borderRadius: 20,
-  padding: 18,
+  padding: 15,
   marginBottom: 16,
 
   shadowColor: '#000',
   shadowOpacity: 0.08,
-  elevation: 1,
+  elevation: 2,
   overflow: 'visible', 
 },
 title: {
