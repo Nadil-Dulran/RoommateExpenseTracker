@@ -32,6 +32,31 @@ export default function GroupsScreen() {
   const [groupName, setGroupName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🏠');
 
+  const toImageUri = (value?: string | null, mimeType?: string | null) => {
+    if (!value) {
+      return null;
+    }
+
+    const normalizedValue = String(value).trim();
+
+    if (!normalizedValue) {
+      return null;
+    }
+
+    if (normalizedValue.startsWith('http://') || normalizedValue.startsWith('https://')) {
+      return normalizedValue;
+    }
+
+    if (normalizedValue.startsWith('data:image')) {
+      return normalizedValue;
+    }
+
+    const compactBase64 = normalizedValue.replace(/\s/g, '');
+    const normalizedMime = mimeType?.trim() || 'image/jpeg';
+
+    return `data:${normalizedMime};base64,${compactBase64}`;
+  };
+
   const getAvatarSource = (avatar: any) => {
     if (!avatar) {
       return profileIcon;
@@ -41,11 +66,23 @@ export default function GroupsScreen() {
   };
 
   const normalizeMembers = (membersRaw: any[]) => {
-    return (membersRaw || []).map((member: any, index: number) => ({
-      id: String(member.id ?? `member-${index}`),
-      name: member.name ?? 'Member',
-      avatar: member.avatar_url ?? null,
-    }));
+    return (membersRaw || []).map((member: any, index: number) => {
+      const source = member?.user ?? member?.profile ?? member?.dataValues ?? member;
+
+      return {
+        id: String(
+          member?.id ??
+          `member-${index}`
+        ),
+        name:
+          member?.name ??
+          'Member',
+        avatar: toImageUri(
+          member?.avatar_base64,
+          null
+        ),
+      };
+    });
   };
 
   const extractMembersPayload = (data: any) => {
