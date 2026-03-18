@@ -15,7 +15,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { categories } from '../../data/mockData';
 import { CategoryType } from '../../types';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { expensesService } from '../../services/expensesService';
 import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
@@ -172,6 +172,9 @@ export default function AddExpenseScreen() {
           ? firstGroup.members.find((m: any) => String(m.id) === String(storedId))
           : null;
         setPaidBy(matchedUser ?? firstGroup.members[0] ?? null);
+      } else {
+        setSelectedGroup(null);
+        setPaidBy(null);
       }
     } catch (e) {
       console.log('Failed to load groups', e);
@@ -234,6 +237,39 @@ export default function AddExpenseScreen() {
       (parseFloat(amount) * parseFloat(p)) / 100
     ).toFixed(2);
   };
+
+  const resetFormInputs = useCallback(() => {
+    setAmount('');
+    setDescription('');
+    setSelectedDate(new Date());
+    setShowPicker(false);
+    setSelectedCategory('food');
+    setSplitType('equal');
+    setExactAmounts({});
+    setPercentages({});
+    setIsSubmitting(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      resetFormInputs();
+      loadGroups();
+    }, [resetFormInputs, loadGroups])
+  );
+
+  const renderSplitMember = (member: any) => (
+    <View style={styles.splitMemberInfo}>
+      <Image
+        source={
+          member.avatarUri
+            ? { uri: member.avatarUri }
+            : profileIcon
+        }
+        style={styles.splitAvatar}
+      />
+      <Text style={styles.splitMemberName}>{member.name}</Text>
+    </View>
+  );
 
 
   return (
@@ -446,12 +482,16 @@ export default function AddExpenseScreen() {
         {/* Equal */}
         {splitType === 'equal' && (
           <View style={styles.splitBox}>
+            <Text style={{ marginBottom: 13, color: '#6A7282' }}>
+              Split equally:
+            </Text>
+
             {(selectedGroup?.members ?? []).map((m: any) => (
               <View
                 key={m.id}
                 style={styles.splitRowItem}
               >
-                <Text>{m.name}</Text>
+                {renderSplitMember(m)}
                 <Text>${splitAmount}</Text>
               </View>
             ))}
@@ -461,12 +501,15 @@ export default function AddExpenseScreen() {
         {/* Exact */}
         {splitType === 'exact' && (
           <View style={styles.splitBox}>
+            <Text style={{ marginBottom: 13, color: '#6A7282' }}>
+              Enter exact amounts:
+            </Text>
             {(selectedGroup?.members ?? []).map((m: any) => (
               <View
                 key={m.id}
                 style={styles.splitRowItem}
               >
-                <Text>{m.name}</Text>
+                {renderSplitMember(m)}
                 <TextInput
                   placeholder="0.00"
                   keyboardType="decimal-pad"
@@ -501,12 +544,15 @@ export default function AddExpenseScreen() {
         {/* Percentage */}
         {splitType === 'percentage' && (
           <View style={styles.splitBox}>
+            <Text style={{ marginBottom: 13, color: '#6A7282' }}>
+              Enter percentages:
+            </Text>
             {(selectedGroup?.members ?? []).map((m: any) => (
               <View
                 key={m.id}
                 style={styles.splitRowItem}
               >
-                <Text>{m.name}</Text>
+                {renderSplitMember(m)}
                 <TextInput
                   placeholder="0"
                   keyboardType="decimal-pad"
@@ -770,6 +816,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+  },
+
+  splitMemberInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+
+  splitAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginRight: 8,
+  },
+
+  splitMemberName: {
+    color: '#101828',
   },
 
   smallInput: {
