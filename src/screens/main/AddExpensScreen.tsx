@@ -163,16 +163,7 @@ export default function AddExpenseScreen() {
 
       setBackendGroups(withMembers);
 
-      if (withMembers.length > 0) {
-        setSelectedGroup(withMembers[0]);
-        // pre-select current user as paidBy if we can match by stored userId
-        const storedId = await AsyncStorage.getItem('userId');
-        const firstGroup = withMembers[0];
-        const matchedUser = storedId
-          ? firstGroup.members.find((m: any) => String(m.id) === String(storedId))
-          : null;
-        setPaidBy(matchedUser ?? firstGroup.members[0] ?? null);
-      } else {
+      if (withMembers.length === 0) {
         setSelectedGroup(null);
         setPaidBy(null);
       }
@@ -192,13 +183,11 @@ export default function AddExpenseScreen() {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [selectedCategory, setSelectedCategory] =
-    useState<CategoryType>('food');
+    useState<CategoryType | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
   const [paidBy, setPaidBy] = useState<any | null>(null);
   const [splitType, setSplitType] =
-    useState<'equal' | 'exact' | 'percentage'>('equal');
-
-  const selectedCategoryMeta = categories[selectedCategory];
+    useState<'equal' | 'exact' | 'percentage' | null>(null);
 
   const [exactAmounts, setExactAmounts] =
     useState<Record<string, string>>({});
@@ -241,10 +230,12 @@ export default function AddExpenseScreen() {
   const resetFormInputs = useCallback(() => {
     setAmount('');
     setDescription('');
+    setSelectedCategory(null);
+    setSelectedGroup(null);
+    setPaidBy(null);
+    setSplitType(null);
     setSelectedDate(new Date());
     setShowPicker(false);
-    setSelectedCategory('food');
-    setSplitType('equal');
     setExactAmounts({});
     setPercentages({});
     setIsSubmitting(false);
@@ -359,13 +350,9 @@ export default function AddExpenseScreen() {
           backendGroups.map(group => (
             <TouchableOpacity
               key={group.id}
-              onPress={async () => {
+              onPress={() => {
                 setSelectedGroup(group);
-                const storedId = await AsyncStorage.getItem('userId');
-                const matchedUser = storedId
-                  ? group.members.find((m: any) => String(m.id) === String(storedId))
-                  : null;
-                setPaidBy(matchedUser ?? group.members[0] ?? null);
+                setPaidBy(null);
               }}
               style={[
                 styles.groupCard,
@@ -590,15 +577,15 @@ export default function AddExpenseScreen() {
 
         {/* Submit */}
         <TouchableOpacity
-          disabled={!amount || !description || isSubmitting || !selectedGroup || !paidBy}
+          disabled={!amount || !description || isSubmitting || !selectedCategory || !selectedGroup || !paidBy || !splitType}
           style={[
             styles.submitBtn,
-            (!amount || !description || isSubmitting || !selectedGroup || !paidBy) && {
+            (!amount || !description || isSubmitting || !selectedCategory || !selectedGroup || !paidBy || !splitType) && {
               backgroundColor: '#99A1AF',
             },
           ]}
           onPress={async () => {
-            if (!selectedGroup || !paidBy) { return; }
+            if (!selectedCategory || !selectedGroup || !paidBy || !splitType) { return; }
             setIsSubmitting(true);
             try {
               const members: any[] = selectedGroup.members ?? [];
@@ -622,7 +609,7 @@ export default function AddExpenseScreen() {
               await expensesService.createExpense({
                 description,
                 amount: parseFloat(amount),
-                category: selectedCategoryMeta.icon,
+                category: categories[selectedCategory].icon,
                 groupId: parseInt(selectedGroup.id, 10),
                 paidById: paidBy.id,
                 date: selectedDate.toISOString().split('T')[0],
