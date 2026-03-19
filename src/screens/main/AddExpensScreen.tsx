@@ -609,7 +609,7 @@ export default function AddExpenseScreen() {
               await expensesService.createExpense({
                 description,
                 amount: parseFloat(amount),
-                category: categories[selectedCategory].icon,
+                category: categories[selectedCategory].name,
                 groupId: parseInt(selectedGroup.id, 10),
                 paidById: paidBy.id,
                 date: selectedDate.toISOString().split('T')[0],
