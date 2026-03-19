@@ -144,6 +144,28 @@ const handleDelete = (item: Expense) => {
     return date.toLocaleDateString();
   };
 
+  const sortRawExpensesByLatest = (items: any[]) => {
+    return [...items].sort((a, b) => {
+      const aTime = Date.parse(String(a?.createdAt ?? a?.created_at ?? a?.date ?? ''));
+      const bTime = Date.parse(String(b?.createdAt ?? b?.created_at ?? b?.date ?? ''));
+
+      if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) {
+        return bTime - aTime;
+      }
+
+      const aId = Number(a?.id ?? a?.expenseId ?? a?.expense_id);
+      const bId = Number(b?.id ?? b?.expenseId ?? b?.expense_id);
+
+      if (Number.isFinite(aId) && Number.isFinite(bId) && aId !== bId) {
+        return bId - aId;
+      }
+
+      return String(b?.id ?? b?.expenseId ?? b?.expense_id ?? '').localeCompare(
+        String(a?.id ?? a?.expenseId ?? a?.expense_id ?? '')
+      );
+    });
+  };
+
   const loadGroups = useCallback(async () => {
     try {
       const groupsResponse = await groupsService.getGroups();
@@ -206,7 +228,8 @@ const handleDelete = (item: Expense) => {
       const directList = Array.isArray(data) ? data : [];
       const fallbackList = directList.length > 0 ? [] : await loadByGroups();
 
-      const normalized = (directList.length > 0 ? directList : fallbackList)
+      const rawList = directList.length > 0 ? directList : fallbackList;
+      const normalized = sortRawExpensesByLatest(rawList)
         .map(normalizeExpense)
         .filter(item => !!item.id);
 
@@ -215,7 +238,7 @@ const handleDelete = (item: Expense) => {
       console.log('Failed to load expenses', e);
       try {
         const fallbackList = await loadByGroups();
-        const normalized = fallbackList
+        const normalized = sortRawExpensesByLatest(fallbackList)
           .map(normalizeExpense)
           .filter(item => !!item.id);
         setExpenses(normalized);
