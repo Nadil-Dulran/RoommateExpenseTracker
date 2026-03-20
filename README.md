@@ -178,6 +178,15 @@ The app builds and launches on the running emulator automatically.
 
 ---
 
+## Running the App in VS Code on Mac
+
+### Backend 
+```sh
+npm run dev
+```
+
+
+
 ## Development Notes
 
 - `src/services/api.ts` — change the base URL here if your network address differs from the default.
