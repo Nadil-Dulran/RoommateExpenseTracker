@@ -5,16 +5,16 @@ import {
   StyleSheet,
   FlatList,
   Modal,
-  ScrollView,
   TextInput,
   Pressable,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Expense } from '../../types';
-import { groups, currentUser, categories } from '../../data/mockData';
 import { expensesService } from '../../services/expensesService';
 import { groupsService } from '../../services/groupsService';
+import { groupMembersService } from '../../services/groupMembersService';
 import { Image } from 'react-native';
 import deleteIcon from '../../../assets/delete.png';
 import editIcon from '../../../assets/edit.png';
@@ -32,8 +32,7 @@ export default function ExpensesScreen() {
 
   const [editDescription, setEditDescription] = useState('');
   const [editAmount, setEditAmount] = useState('');
-  const [splitType, setSplitType] = useState<'equal' | 'exact' | 'percentage'>('equal');
-  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>({});
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
 
 
@@ -42,14 +41,6 @@ const handleEdit = (item: Expense) => {
   setSelectedExpense(item);
   setEditDescription(item.description);
   setEditAmount(item.amount.toString());
-
-  const initialExact: Record<string, string> = {};
-  item.splits.forEach(split => {
-    initialExact[split.userId] = split.amount.toString();
-  });
-
-  setExactAmounts(initialExact);
-  setSplitType('equal');
   setShowEditModal(true);
 };
 
@@ -59,41 +50,76 @@ const handleDelete = (item: Expense) => {
   setShowDeleteModal(true);
 };
 
-  const getCategoryEmoji = (categoryValue: unknown) => {
-    if (!categoryValue) {
-      return categories.other.icon;
+  const loadCurrentUserId = useCallback(async () => {
+    try {
+      const storedUserId =
+        (await AsyncStorage.getItem('userId')) ??
+        (await AsyncStorage.getItem('user_id'));
+      if (storedUserId) {
+        setCurrentUserId(String(storedUserId));
+      }
+    } catch (error) {
+      console.log('Failed to load current user id', error);
     }
-
-    const value = String(categoryValue).trim();
-
-    const directEmojiMatch = Object.values(categories).find(
-      category => category.icon === value
-    );
-
-    if (directEmojiMatch) {
-      return directEmojiMatch.icon;
-    }
-
-    const normalized = value.toLowerCase();
-    const keyOrNameMatch = Object.entries(categories).find(
-      ([key, category]) =>
-        key.toLowerCase() === normalized ||
-        category.name.toLowerCase() === normalized
-    );
-
-    return keyOrNameMatch?.[1].icon ?? value;
-  };
+  }, []);
 
   const normalizeGroupInfo = (group: any) => ({
     id: String(group?.id ?? ''),
     name: group?.name || 'Untitled Group',
     emoji: group?.emoji || '👥',
-    members: Array.isArray(group?.members) ? group.members : [],
+    members: Array.isArray(group?.members)
+      ? group.members
+      : Array.isArray(group?.users)
+      ? group.users
+      : [],
+  });
+
+  const extractMembersPayload = (data: any): any[] => {
+    if (Array.isArray(data)) { return data; }
+    if (Array.isArray(data?.data)) { return data.data; }
+    if (Array.isArray(data?.members)) { return data.members; }
+    return [];
+  };
+
+  const normalizeMember = (member: any) => ({
+    id: String(member?.id ?? member?.user_id ?? member?.userId ?? ''),
+    name:
+      member?.name ??
+      member?.user?.name ??
+      member?.full_name ??
+      'Unknown',
   });
 
   const normalizeExpense = (raw: any): Expense => {
+    const getSplitUserId = (split: any) => {
+      return String(
+        split?.userId ??
+        split?.user_id ??
+        split?.memberId ??
+        split?.member_id ??
+        split?.user?.id ??
+        split?.user?.user_id ??
+        ''
+      );
+    };
+
+    const getSplitAmount = (split: any) => {
+      return Number(
+        split?.share_amount ??
+        split?.amount ??
+        split?.shareAmount ??
+        split?.share ??
+        split?.split_amount ??
+        0
+      );
+    };
+
     const splitsRaw = Array.isArray(raw?.splits)
       ? raw.splits
+      : Array.isArray(raw?.expenseSplits)
+      ? raw.expenseSplits
+      : Array.isArray(raw?.expense_splits)
+      ? raw.expense_splits
       : Array.isArray(raw?.splitDetails)
       ? raw.splitDetails
       : Array.isArray(raw?.split_details)
@@ -103,6 +129,8 @@ const handleDelete = (item: Expense) => {
       : [];
 
     const paidById = String(
+      raw?.paidByUser?.id ??
+      raw?.paid_by_user?.id ??
       raw?.paidBy?.id ??
       raw?.paidById ??
       raw?.paid_by ??
@@ -112,32 +140,38 @@ const handleDelete = (item: Expense) => {
       ''
     );
 
+    const processedSplits = splitsRaw
+      .map((split: any) => {
+        const userId = getSplitUserId(split);
+        const amount = getSplitAmount(split);
+        return { userId, amount };
+      })
+      .filter((split: { userId: string; amount: number }) => !!split.userId && split.amount > 0);
+
     return {
       id: String(raw?.id ?? raw?.expenseId ?? raw?.expense_id ?? ''),
       category: (raw?.categoryEmoji ?? raw?.category_emoji ?? raw?.category ?? raw?.type ?? 'other') as Expense['category'],
       description: raw?.description ?? raw?.title ?? 'Expense',
       amount: Number(raw?.amount ?? raw?.total ?? raw?.expense_amount ?? 0),
-      date: String(raw?.date ?? raw?.createdAt ?? raw?.created_at ?? new Date().toISOString()),
+      date: String(raw?.date ?? raw?.expense_date ?? raw?.createdAt ?? raw?.created_at ?? new Date().toISOString()),
       groupId: String(raw?.groupId ?? raw?.group_id ?? raw?.group?.id ?? ''),
       paidBy: {
         id: paidById,
         name:
+          raw?.paidByUser?.name ??
+          raw?.paid_by_user?.name ??
           raw?.paidBy?.name ??
           raw?.paidByName ??
           raw?.paid_by_name ??
           raw?.payer_name ??
           'Unknown',
       },
-      splits: splitsRaw.map((split: any) => ({
-        userId: String(split?.userId ?? split?.user_id ?? split?.memberId ?? split?.member_id ?? split?.id ?? ''),
-        amount: Number(split?.amount ?? split?.share ?? split?.split_amount ?? 0),
-      })),
+      splits: processedSplits,
     };
   };
 
   const getGroupInfo = (groupId: string) =>
-    backendGroups.find(g => String(g.id) === String(groupId)) ||
-    groups.find(g => String(g.id) === String(groupId));
+    backendGroups.find(g => String(g.id) === String(groupId));
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -177,7 +211,23 @@ const handleDelete = (item: Expense) => {
         ? groupsResponse.groups
         : [];
 
-      setBackendGroups(groupList.map(normalizeGroupInfo));
+      const baseGroups = groupList.map(normalizeGroupInfo);
+      const groupsWithMembers = await Promise.all(
+        baseGroups.map(async (group: any) => {
+          try {
+            const membersResponse = await groupMembersService.getMembers(group.id);
+            const members = extractMembersPayload(membersResponse).map(normalizeMember);
+            return { ...group, members: members.length > 0 ? members : group.members };
+          } catch {
+            return {
+              ...group,
+              members: (group.members || []).map(normalizeMember),
+            };
+          }
+        })
+      );
+
+      setBackendGroups(groupsWithMembers);
     } catch (error) {
       console.log('Failed to load groups for expenses', error);
       setBackendGroups([]);
@@ -226,19 +276,17 @@ const handleDelete = (item: Expense) => {
     try {
       const data = await expensesService.getExpenses();
       const directList = Array.isArray(data) ? data : [];
-      const fallbackList = directList.length > 0 ? [] : await loadByGroups();
-
-      const rawList = directList.length > 0 ? directList : fallbackList;
+      const rawList = directList.length > 0 ? directList : await loadByGroups();
       const normalized = sortRawExpensesByLatest(rawList)
         .map(normalizeExpense)
         .filter(item => !!item.id);
 
       setExpenses(normalized);
     } catch (e) {
-      console.log('Failed to load expenses', e);
+      console.log('Failed to load expenses directly', e);
       try {
-        const fallbackList = await loadByGroups();
-        const normalized = sortRawExpensesByLatest(fallbackList)
+        const rawList = await loadByGroups();
+        const normalized = sortRawExpensesByLatest(rawList)
           .map(normalizeExpense)
           .filter(item => !!item.id);
         setExpenses(normalized);
@@ -250,15 +298,17 @@ const handleDelete = (item: Expense) => {
   }, []);
 
   useEffect(() => {
+    loadCurrentUserId();
     loadGroups();
     loadExpenses();
-  }, [loadExpenses, loadGroups]);
+  }, [loadCurrentUserId, loadExpenses, loadGroups]);
 
   useFocusEffect(
     useCallback(() => {
+      loadCurrentUserId();
       loadGroups();
       loadExpenses();
-    }, [loadExpenses, loadGroups])
+    }, [loadCurrentUserId, loadExpenses, loadGroups])
   );
 
 
@@ -290,13 +340,44 @@ const handleDelete = (item: Expense) => {
   const splits = Array.isArray(item.splits) ? item.splits : [];
   const paidBy = item.paidBy ?? { id: '', name: 'Unknown' };
   const group = getGroupInfo(item.groupId);
-  const categoryEmoji = getCategoryEmoji(item.category);
-  const myShare = splits.find(s => String(s.userId) === String(currentUser.id));
-  const isMyExpense = String(paidBy.id) === String(currentUser.id);
+  const resolvedCurrentUserId = String(currentUserId || '');
 
-  const amountOwed = isMyExpense
-    ? item.amount - (myShare?.amount || 0)
-    : 0;
+  const normalizedSplits = splits
+    .map(split => ({
+      userId: String(split.userId ?? ''),
+      amount: Number(split.amount ?? 0),
+    }))
+    .filter(split => !!split.userId);
+
+  const paidByName =
+    paidBy.name && paidBy.name !== 'Unknown'
+      ? paidBy.name
+      : group?.members?.find((member: any) => String(member.id) === String(paidBy.id))?.name ?? 'Unknown';
+  const myShareAmount =
+    normalizedSplits.find(split => String(split.userId) === String(resolvedCurrentUserId))?.amount ?? 0;
+  const isMyExpense = String(paidBy.id) === String(resolvedCurrentUserId);
+
+  const amountYouAreOwed = normalizedSplits
+    .filter(split => String(split.userId) !== String(resolvedCurrentUserId))
+    .reduce((sum, split) => sum + split.amount, 0);
+
+  const statusAmount = isMyExpense ? amountYouAreOwed : myShareAmount;
+  const splitCount = normalizedSplits.length;
+
+  const getSplitMemberName = (splitUserId: string) => {
+    if (String(splitUserId) === String(resolvedCurrentUserId)) {
+      return 'You';
+    }
+
+    if (String(splitUserId) === String(paidBy.id)) {
+      return paidByName;
+    }
+
+    return (
+      group?.members?.find((member: any) => String(member.id) === String(splitUserId))?.name ??
+      `User ${splitUserId}`
+    );
+  };
 
 return (
   <View style={[styles.card,  activeMenuId === item.id && { zIndex: 999 } ]}>
@@ -327,8 +408,8 @@ return (
            <Pressable
             onPress={() => {
               setActiveMenuId(null);
-               const yourSplit = splits.find(
-               split => String(split.userId) === String(currentUser.id)
+               const yourSplit = normalizedSplits.find(
+               split => String(split.userId) === String(resolvedCurrentUserId)
               );
               navigation.navigate('SettleUp', {
                               mode: 'single',
@@ -384,44 +465,24 @@ return (
     {/* Paid + Owed */}
     <View style={styles.paidRow}>
       <Text style={styles.metaLight}>Paid by </Text>
-      <Text style={styles.bold}>{paidBy.name}</Text>
+      <Text style={styles.bold}>{paidByName}</Text>
 
       <Text style={styles.metaLight}>  •  </Text>
 
-      {isMyExpense && amountOwed > 0 && (
-        <Text style={styles.owedText}>
-          You are owed:  ${amountOwed.toFixed(2)}
-        </Text>
-      )}
-
-      {!isMyExpense && myShare && (
-        <Text style={styles.oweText}>
-          You owe ${myShare.amount.toFixed(2)}
-        </Text>
-      )}
+      <Text style={isMyExpense ? styles.owedText : styles.oweText}>
+        {isMyExpense ? 'You are owed: ' : 'You owe: '} ${statusAmount.toFixed(2)}
+      </Text>
     </View>
 
     {/* Divider */}
     <View style={styles.divider} />
 
-    {/* Split Pills */}
-    <View style={styles.splitRow}>
+{/* Split Pills (INLINE like screenshot) */}
 <View style={styles.splitRow}>
   <Text style={styles.metaLight}>Split:</Text>
 
-  {splits.map(split => {
-    let memberName = 'Unknown';
-
-    if (String(split.userId) === String(currentUser.id)) {
-      memberName = 'You';
-    } else if (String(split.userId) === String(paidBy.id)) {
-      memberName = paidBy.name;
-    } else {
-      const member = group?.members.find(
-        (member: any) => String(member.id) === String(split.userId)
-      );
-      memberName = member?.name ?? 'Unknown';
-    }
+  {normalizedSplits.map(split => {
+    const memberName = getSplitMemberName(String(split.userId));
 
     return (
       <View key={split.userId} style={styles.splitPill}>
@@ -432,7 +493,6 @@ return (
     );
   })}
 </View>
-    </View>
   </View>
 );};
 
@@ -500,80 +560,6 @@ return (
             style={styles.amountInput}
           />
         </View>
-
-        {/* Split Selector */}
-        <Text style={styles.label}>Split</Text>
-        <View style={styles.splitRow}>
-          {['equal', 'exact', 'percentage'].map(type => (
-            <Pressable
-              key={type}
-              onPress={() => setSplitType(type as any)}
-              style={[
-                styles.splitButton,
-                splitType === type && styles.activeSplitButton
-              ]}
-            >
-              <Text
-                style={[
-                  styles.splitButtonText,
-                  splitType === type && styles.activeSplitText
-                ]}
-              >
-                {type === 'equal' ? 'Equal' : type === 'exact' ? 'Exact' : '%'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* Exact Split */}
-        {splitType === 'exact' && selectedExpense && (
-          <View style={styles.splitContainer}>
-            {selectedExpense.splits.map(split => {
-              const member =
-                split.userId === selectedExpense.paidBy.id
-                  ? selectedExpense.paidBy
-                  : groups
-                      .find(g => g.id === selectedExpense.groupId)
-                      ?.members.find(m => m.id === split.userId);
-
-              if (!member) return null;
-
-              return (
-                <View key={split.userId} style={styles.splitInputRow}>
-                  <Text>{member.name}</Text>
-                  <View style={styles.smallAmountContainer}>
-                    <Text>$</Text>
-                    <TextInput
-                      value={exactAmounts[split.userId]}
-                      onChangeText={val =>
-                        setExactAmounts({
-                          ...exactAmounts,
-                          [split.userId]: val,
-                        })
-                      }
-                      keyboardType="numeric"
-                      style={styles.smallAmountInput}
-                    />
-                  </View>
-                </View>
-              );
-            })}
-
-            {/* Total */}
-            <View style={styles.totalRow}>
-              <Text>Total:</Text>
-              <Text style={{ fontWeight: '600', color: '#009966' }}>
-                $
-                {Object.values(exactAmounts)
-                  .reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
-                  .toFixed(2)}
-                {' / $'}
-                {editAmount}
-              </Text>
-            </View>
-          </View>
-        )}
-
 
       {/* Buttons */}
       <View style={styles.modalActions}>
@@ -690,6 +676,23 @@ meta: {
   color: '#6A7282',
   marginTop: 6,
 },
+splitRow: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 7,
+  marginTop: 1,
+},
+splitPill: {
+  backgroundColor: '#F2F4F7',
+  paddingVertical: 4,
+  paddingHorizontal: 10,
+  borderRadius: 14,
+},
+splitText: {
+  fontSize: 12,
+  color: '#344054',
+},
 metaLight: {
   fontSize: 13,
   color: '#98A2B3',
@@ -716,24 +719,16 @@ divider: {
   backgroundColor: '#F2F4F7',
   marginVertical: 12,
 },
-splitRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  flexWrap: 'wrap',
+splitList: {
   gap: 8,
 },
 
-splitPill: {
+splitStackItem: {
   backgroundColor: '#F2F4F7',
-  paddingVertical: 6,
+  borderRadius: 10,
   paddingHorizontal: 12,
-  borderRadius: 20,
-  marginLeft: 8,
-},
-
-splitText: {
-  fontSize: 12,
-  color: '#344054',
+  paddingVertical: 10,
+  gap: 4,
 },
   metaSmall: {
     fontSize: 12,
@@ -902,64 +897,6 @@ dollar: {
 amountInput: {
   flex: 1,
   paddingVertical: 10,
-},
-
-splitButton: {
-  flex: 1,
-  paddingVertical: 10,
-  borderWidth: 1,
-  borderColor: '#E5E7EB',
-  borderRadius: 12,
-  alignItems: 'center',
-  marginHorizontal: 4,
-},
-
-activeSplitButton: {
-  borderColor: '#009966',
-  backgroundColor: '#E6F4EC',
-},
-
-splitButtonText: {
-  color: '#6A7282',
-},
-
-activeSplitText: {
-  color: '#009966',
-  fontWeight: '600',
-},
-
-splitContainer: {
-  marginTop: 15,
-  backgroundColor: '#F9FAFB',
-  borderRadius: 16,
-  padding: 15,
-},
-
-splitInputRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 10,
-},
-
-smallAmountContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  borderWidth: 1,
-  borderColor: '#E5E7EB',
-  borderRadius: 10,
-  paddingHorizontal: 8,
-},
-
-smallAmountInput: {
-  width: 50,
-  paddingVertical: 4,
-},
-
-totalRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  marginTop: 10,
 },
 
 modalActions: {
