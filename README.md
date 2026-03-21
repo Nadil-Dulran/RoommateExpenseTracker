@@ -185,6 +185,10 @@ The app builds and launches on the running emulator automatically.
 npm run dev
 ```
 
+### Frontend 1st Terminal 
+```sh
+npx react-native start
+```
 
 
 ## Development Notes
