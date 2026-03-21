@@ -190,6 +190,10 @@ npm run dev
 npx react-native start
 ```
 
+### Frontend 2nd Terminal
+```sh
+npx react-native run-android
+```
 
 ## Development Notes
 
