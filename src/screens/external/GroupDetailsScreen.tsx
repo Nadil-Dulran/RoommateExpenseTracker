@@ -1079,6 +1079,12 @@ const renderAvatar = (avatar?: string | any) => {
   .map(expense => {
   const categoryIcon = getCategoryIcon(expense.category);
   const share = calculateUserShareFromSplits(expense);
+  const expenseTitle = String(expense.description ?? 'Expense').trim();
+  const expenseTitleWords = expenseTitle.split(/\s+/).filter(Boolean);
+  const isLongExpenseTitle = expenseTitleWords.length > 5;
+  const expenseTitleDisplay = isLongExpenseTitle
+    ? `${expenseTitleWords.slice(0, 5).join(' ')}\n${expenseTitleWords.slice(5).join(' ')}`
+    : expenseTitle;
   const isCurrentUserPayer = String(expense.paidBy.id) === String(currentUserId);
   const paidByName =
     expense.paidBy.name && expense.paidBy.name !== 'Unknown'
@@ -1121,18 +1127,30 @@ const renderAvatar = (avatar?: string | any) => {
       <View style={styles.expenseContent}>
 
         {/* Row 1: Title + Amount */}
-        <View style={styles.rowBetween}>
-          <Text style={styles.expenseTitlee}>
-            {expense.description}
-          </Text>
+        {isLongExpenseTitle ? (
+          <View style={styles.expenseTitleBlock}>
+            <Text style={styles.expenseTitlee}>
+              {expenseTitleDisplay}
+            </Text>
 
-          <Text style={styles.expenseAmount}>
-            ${expense.amount.toFixed(2)}
-          </Text>
-        </View>
+            <Text style={styles.expenseAmountBelow}>
+              ${expense.amount.toFixed(2)}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.rowBetween}>
+            <Text style={[styles.expenseTitlee, styles.expenseTitleInline]}>
+              {expenseTitleDisplay}
+            </Text>
+
+            <Text style={styles.expenseAmount}>
+              ${expense.amount.toFixed(2)}
+            </Text>
+          </View>
+        )}
 
         {/* Row 2: Paid + Date */}
-        <View style={styles.rowBetween}>
+        <View style={[styles.rowBetween, styles.expenseMetaRow]}>
           <Text style={styles.expenseSubb}>
             {isCurrentUserPayer
               ? 'You paid'
@@ -1776,10 +1794,30 @@ expenseAmount: {
   fontWeight: '700',
 },
 
+expenseTitleInline: {
+  flex: 1,
+  marginRight: 12,
+},
+
+expenseTitleBlock: {
+  marginBottom: 0,
+},
+
+expenseAmountBelow: {
+  fontSize: 18,
+  fontWeight: '700',
+  alignSelf: 'flex-end',
+  marginTop: -10,
+},
+
+expenseMetaRow: {
+  marginTop: 2,
+},
+
 expenseSubb: {
   fontSize: 13,
   color: '#6a7282',
-  marginTop: 4,
+  marginTop: 0,
 },
 
 expenseDate: {
