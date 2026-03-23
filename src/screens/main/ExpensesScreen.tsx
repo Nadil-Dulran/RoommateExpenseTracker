@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,10 @@ export default function ExpensesScreen() {
   const [editDescription, setEditDescription] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
+
+  const roundCurrency = (value: number) => {
+    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  };
 
 
 
@@ -335,6 +339,49 @@ const handleDelete = (item: Expense) => {
     await loadExpenses();
   };
 
+  const memberNetByGroup = useMemo(() => {
+    const me = String(currentUserId || '');
+    const netMap = new Map<string, number>();
+
+    if (!me) {
+      return netMap;
+    }
+
+    expenses.forEach(expense => {
+      const paidById = String(expense?.paidBy?.id ?? '');
+      const groupId = String(expense?.groupId ?? '');
+      const normalizedSplits = Array.isArray(expense.splits)
+        ? expense.splits.map(split => ({
+            userId: String(split.userId ?? ''),
+            amount: Number(split.amount ?? 0),
+          }))
+        : [];
+
+      const mySplit = normalizedSplits.find(split => split.userId === me);
+
+      if (paidById === me) {
+        normalizedSplits.forEach(split => {
+          if (!split.userId || split.userId === me || split.amount <= 0) {
+            return;
+          }
+
+          const key = `${groupId}::${split.userId}`;
+          const next = roundCurrency((netMap.get(key) ?? 0) + split.amount);
+          netMap.set(key, next);
+        });
+        return;
+      }
+
+      if (mySplit && paidById) {
+        const key = `${groupId}::${paidById}`;
+        const next = roundCurrency((netMap.get(key) ?? 0) - mySplit.amount);
+        netMap.set(key, next);
+      }
+    });
+
+    return netMap;
+  }, [expenses, currentUserId]);
+
 
   const renderExpense = ({ item }: { item: Expense }) => {
   const splits = Array.isArray(item.splits) ? item.splits : [];
@@ -361,8 +408,20 @@ const handleDelete = (item: Expense) => {
     .filter(split => String(split.userId) !== String(resolvedCurrentUserId))
     .reduce((sum, split) => sum + split.amount, 0);
 
-  const statusAmount = isMyExpense ? amountYouAreOwed : myShareAmount;
-  const splitCount = normalizedSplits.length;
+  const statusAmount = roundCurrency(isMyExpense ? amountYouAreOwed : myShareAmount);
+  const isSettlementEntry = String(item.description || '').trim().toLowerCase() === 'settlement';
+  const counterpartyId =
+    isMyExpense
+      ? normalizedSplits.find(split => String(split.userId) !== String(resolvedCurrentUserId))?.userId ?? ''
+      : String(paidBy.id ?? '');
+
+  const counterpartyName =
+    group?.members?.find((member: any) => String(member.id) === String(counterpartyId))?.name ??
+    (isMyExpense ? `User ${counterpartyId}` : paidByName);
+
+  const netWithCounterparty = memberNetByGroup.get(`${String(item.groupId)}::${String(counterpartyId)}`) ?? 0;
+  const isSettledWithCounterparty =
+    !!counterpartyId && Math.abs(roundCurrency(netWithCounterparty)) < 0.01;
 
   const getSplitMemberName = (splitUserId: string) => {
     if (String(splitUserId) === String(resolvedCurrentUserId)) {
@@ -405,27 +464,38 @@ return (
       {activeMenuId === item.id && (
         <View style={styles.dropdown}>
 
-           <Pressable
-            onPress={() => {
-              setActiveMenuId(null);
-               const yourSplit = normalizedSplits.find(
-               split => String(split.userId) === String(resolvedCurrentUserId)
-              );
-              navigation.navigate('SettleUp', {
-                              mode: 'single',
-                              memberId: paidBy.id,
-                              amount:  yourSplit?.amount ?? 0,
-                             });
-            }}
-            style={styles.menuItem}
-          >
-            <View style={styles.menuRowItem}>
-              <Icon name="dollar-sign" size={16} color="#009966" />
-              <Text style={[styles.menuText, { color: '#009966' }]}>
-                Settle Up
-              </Text>
+           {!isSettlementEntry && !isSettledWithCounterparty && !!counterpartyId && statusAmount >= 0.01 ? (
+            <Pressable
+              onPress={() => {
+                setActiveMenuId(null);
+                navigation.navigate('SettleUp', {
+                  mode: 'single',
+                  memberId: String(counterpartyId),
+                  amount: statusAmount,
+                  memberName: counterpartyName,
+                  isYouPaying: !isMyExpense,
+                  groupId: String(item.groupId),
+                });
+              }}
+              style={styles.menuItem}
+            >
+              <View style={styles.menuRowItem}>
+                <Icon name="dollar-sign" size={16} color="#009966" />
+                <Text style={[styles.menuText, { color: '#009966' }] }>
+                  Settle Up
+                </Text>
+              </View>
+            </Pressable>
+           ) : (
+            <View style={styles.menuItem}>
+              <View style={styles.menuRowItem}>
+                <Icon name="check-circle" size={16} color="#12B76A" />
+                <Text style={[styles.menuText, { color: '#12B76A' }] }>
+                  Settled
+                </Text>
+              </View>
             </View>
-          </Pressable>
+           )}
 
           <Pressable
             onPress={() => handleEdit(item)}
@@ -469,9 +539,13 @@ return (
 
       <Text style={styles.metaLight}>  •  </Text>
 
-      <Text style={isMyExpense ? styles.owedText : styles.oweText}>
-        {isMyExpense ? 'You are owed: ' : 'You owe: '} ${statusAmount.toFixed(2)}
-      </Text>
+      {isSettlementEntry || isSettledWithCounterparty || statusAmount < 0.01 ? (
+        <Text style={styles.settledText}>Settled</Text>
+      ) : (
+        <Text style={isMyExpense ? styles.owedText : styles.oweText}>
+          {isMyExpense ? 'You are owed: ' : 'You owe: '} ${statusAmount.toFixed(2)}
+        </Text>
+      )}
     </View>
 
     {/* Divider */}
@@ -509,6 +583,7 @@ return (
   data={expenses}
   keyExtractor={item => String(item.id)}
   renderItem={renderExpense}
+  removeClippedSubviews={false}
   ListHeaderComponent={
     <>
      {/* Add header content here */ }
@@ -707,6 +782,11 @@ paidRow: {
 owedText: {
   color: '#12B76A',
   fontWeight: '600',
+},
+
+settledText: {
+  color: '#12B76A',
+  fontWeight: '700',
 },
 
 oweText: {
