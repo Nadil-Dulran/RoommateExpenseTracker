@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
+import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
 
@@ -55,6 +55,10 @@ export default function GroupDetailsScreen() {
 
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
+
+  const roundCurrency = (value: number) => {
+    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+  };
 
   const getCategoryIcon = (value: unknown) => {
     const normalized = String(value ?? 'other').trim().toLowerCase();
@@ -341,6 +345,14 @@ export default function GroupDetailsScreen() {
     loadGroupExpenses();
   }, [loadCurrentUserId, loadGroupInfo, loadGroupMembers, loadGroupExpenses]);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadCurrentUserId();
+      loadGroupMembers();
+      loadGroupExpenses();
+    }, [loadCurrentUserId, loadGroupMembers, loadGroupExpenses])
+  );
+
   useEffect(() => {
     setEditName(group?.name ?? '');
     setSelectedEmoji(group?.emoji ?? '🏠');
@@ -480,15 +492,23 @@ export default function GroupDetailsScreen() {
       });
 
       return Array.from(memberMap.values())
-        .map(member => ({
-          ...member,
-          isYouPaying: member.amount < 0,
-          amount: Math.abs(member.amount),
-        }))
-        .filter(member => member.amount > 0);
+        .map(member => {
+          const netAmount = roundCurrency(member.amount);
+
+          return {
+            ...member,
+            isYouPaying: netAmount < 0,
+            amount: Math.abs(netAmount),
+          };
+        })
+        .filter(member => member.amount >= 0.01);
     },
     [currentUserId, groupExpenses, group?.members]
   );
+
+  const unsettledMemberIds = useMemo(() => {
+    return new Set(memberBalances.map(member => String(member.id)));
+  }, [memberBalances]);
 
   const calculateUserShareFromSplits = useCallback((expense: Expense) => {
     const me = String(currentUserId || '');
@@ -811,6 +831,9 @@ const renderAvatar = (avatar?: string | any) => {
                     mode: 'single',
                     memberId: member.id,
                     amount: member.amount,
+                    memberName: member.name,
+                    isYouPaying: member.isYouPaying,
+                    groupId: String(group?.id ?? id),
                   })
                 }
               >
@@ -1040,14 +1063,20 @@ const renderAvatar = (avatar?: string | any) => {
 
           <TouchableOpacity
             onPress={() =>
-              navigation.navigate('SettleUp', { mode: 'all' })
+              navigation.navigate('SettleUp', {
+                mode: 'all',
+                groupId: String(group?.id ?? id),
+              })
             }
           >
             <Text style={{ color: '#009966' }}>Settle up</Text>
           </TouchableOpacity>
         </View>
 
-{groupExpenses.slice(0, 3).map(expense => {
+{groupExpenses
+  .filter(expense => String(expense.description || '').trim().toLowerCase() !== 'settlement')
+  .slice(0, 3)
+  .map(expense => {
   const categoryIcon = getCategoryIcon(expense.category);
   const share = calculateUserShareFromSplits(expense);
   const isCurrentUserPayer = String(expense.paidBy.id) === String(currentUserId);
@@ -1062,6 +1091,8 @@ const renderAvatar = (avatar?: string | any) => {
       ? expense.splits.find(s => String(s.userId) !== String(currentUserId))?.userId ?? ''
       : expense.paidBy.id;
 
+  const isSettledWithMember = !!memberId && !unsettledMemberIds.has(String(memberId));
+
   const amount = share?.amount ?? 0;
 
 
@@ -1075,6 +1106,9 @@ const renderAvatar = (avatar?: string | any) => {
           mode: 'single',
           memberId,
           amount,
+          memberName: resolveMemberNameById(String(memberId), `Member ${memberId}`),
+          isYouPaying: share?.type === 'owing',
+          groupId: String(group?.id ?? id),
         })
       }
     >
@@ -1117,7 +1151,16 @@ const renderAvatar = (avatar?: string | any) => {
         <View style={styles.expenseDivider} />
 
         {/* Row 3: Share */}
-        {share && (
+        {isSettledWithMember ? (
+          <Text
+            style={[
+              styles.expenseShare,
+              { color: '#16a34a' },
+            ]}
+          >
+            Settled
+          </Text>
+        ) : share && (
           <Text
             style={[
               styles.expenseShare,
