@@ -6,8 +6,15 @@ export type RootStackParamList = {
   MainTabs: undefined;
 
   SettleUp:
-    | { mode: 'all' }
-    | { mode: 'single'; memberId: string; amount: number };
+    | { mode: 'all'; groupId?: string }
+    | {
+        mode: 'single';
+        memberId: string;
+        amount?: number;
+        groupId?: string;
+        memberName?: string;
+        isYouPaying?: boolean;
+      };
 
   Notifications: undefined;
   GroupDetails: { id: string; group?: any };
