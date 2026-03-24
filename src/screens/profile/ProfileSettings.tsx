@@ -28,6 +28,11 @@ const currencies = [
   { code: 'LKR', symbol: 'Rs.', name: 'Sri Lankan Rupee' },
 ];
 
+const AVATAR_COMPRESSION_QUALITY = 0.5;
+const AVATAR_MAX_WIDTH = 720;
+const AVATAR_MAX_HEIGHT = 720;
+const MAX_AVATAR_BASE64_BYTES = 700 * 1024;
+
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
 
@@ -42,6 +47,13 @@ export default function ProfileScreen() {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [avatarMimeType, setAvatarMimeType] = useState('image/jpeg');
   const [avatarChanged, setAvatarChanged] = useState(false);
+
+  const estimateBase64Bytes = (base64: string) => {
+    const compact = base64.replace(/\s/g, '');
+    const padding = compact.endsWith('==') ? 2 : compact.endsWith('=') ? 1 : 0;
+
+    return Math.floor((compact.length * 3) / 4) - padding;
+  };
 
   const toImageUri = (value?: string | null, mimeType?: string) => {
     if (!value) {
@@ -90,9 +102,9 @@ export default function ProfileScreen() {
       mediaType: 'photo',
       includeBase64: true,
       selectionLimit: 1,
-      quality: 0.6,
-      maxWidth: 1024,
-      maxHeight: 1024,
+      quality: AVATAR_COMPRESSION_QUALITY,
+      maxWidth: AVATAR_MAX_WIDTH,
+      maxHeight: AVATAR_MAX_HEIGHT,
     });
 
     if (response.didCancel) {
@@ -112,6 +124,16 @@ export default function ProfileScreen() {
     }
 
     const rawBase64 = selectedAsset.base64;
+    const estimatedAvatarBytes = estimateBase64Bytes(rawBase64);
+
+    if (estimatedAvatarBytes > MAX_AVATAR_BASE64_BYTES) {
+      Alert.alert(
+        'Image is too large',
+        'Please pick a smaller image. For best results, use a square photo under 2 MB.',
+      );
+      return;
+    }
+
     const selectedMimeType = selectedAsset.type || 'image/jpeg';
     const previewUri = toImageUri(rawBase64, selectedMimeType) || '';
 
