@@ -21,6 +21,8 @@ import { Expense, User } from '../../types';
 import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
 import { expensesService } from '../../services/expensesService';
+import { calculateGroupBalance } from '../../utils/balance';
+import { extractExpensesPayload, normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
 
 type RouteProps = RouteProp<RootStackParamList, 'GroupDetails'>;
 type NavProps = NativeStackNavigationProp<RootStackParamList>;
@@ -126,118 +128,12 @@ export default function GroupDetailsScreen() {
     });
   };
 
-  const extractExpensesPayload = (data: any): any[] => {
-    if (Array.isArray(data)) { return data; }
-    if (Array.isArray(data?.data)) { return data.data; }
-    if (Array.isArray(data?.expenses)) { return data.expenses; }
-    if (Array.isArray(data?.items)) { return data.items; }
-    if (Array.isArray(data?.data?.expenses)) { return data.data.expenses; }
-    return [];
-  };
-
-  const normalizeExpense = (raw: any): Expense => {
-    const getSplitUserId = (split: any) => {
-      return String(
-        split?.userId ??
-        split?.user_id ??
-        split?.memberId ??
-        split?.member_id ??
-        split?.user?.id ??
-        split?.user?.user_id ??
-        ''
-      );
-    };
-
-    const getSplitAmount = (split: any) => {
-      return Number(
-        split?.share_amount ??
-        split?.amount ??
-        split?.shareAmount ??
-        split?.share ??
-        split?.split_amount ??
-        0
-      );
-    };
-
-    const splitsRaw = Array.isArray(raw?.splits)
-      ? raw.splits
-      : Array.isArray(raw?.expenseSplits)
-      ? raw.expenseSplits
-      : Array.isArray(raw?.expense_splits)
-      ? raw.expense_splits
-      : Array.isArray(raw?.splitDetails)
-      ? raw.splitDetails
-      : Array.isArray(raw?.split_details)
-      ? raw.split_details
-      : [];
-
-    const paidById = String(
-      raw?.paidByUser?.id ??
-      raw?.paid_by_user?.id ??
-      raw?.paidBy?.id ??
-      raw?.paidById ??
-      raw?.paid_by ??
-      raw?.paid_by_id ??
-      raw?.userId ??
-      raw?.user_id ??
-      ''
-    );
-
-    const splits = splitsRaw
-      .map((split: any) => ({
-        userId: getSplitUserId(split),
-        amount: getSplitAmount(split),
-      }))
-      .filter((split: { userId: string; amount: number }) => !!split.userId && split.amount > 0);
-
-    return {
-      id: String(raw?.id ?? raw?.expenseId ?? raw?.expense_id ?? ''),
-      category: String(raw?.category ?? raw?.type ?? 'other').toLowerCase() as Expense['category'],
-      description: raw?.description ?? raw?.title ?? 'Expense',
-      amount: Number(raw?.amount ?? raw?.total ?? raw?.expense_amount ?? 0),
-      date: String(raw?.date ?? raw?.expense_date ?? raw?.createdAt ?? raw?.created_at ?? new Date().toISOString()),
-      groupId: String(raw?.groupId ?? raw?.group_id ?? raw?.group?.id ?? id),
-      paidBy: {
-        id: paidById,
-        name:
-          raw?.paidByUser?.name ??
-          raw?.paid_by_user?.name ??
-          raw?.paidBy?.name ??
-          raw?.paid_by_name ??
-          raw?.paidByName ??
-          'Unknown',
-      },
-      splits,
-    };
-  };
-
-  const sortRawExpensesByLatest = (items: any[]) => {
-    return [...items].sort((a, b) => {
-      const aTime = Date.parse(String(a?.createdAt ?? a?.created_at ?? a?.date ?? a?.expense_date ?? ''));
-      const bTime = Date.parse(String(b?.createdAt ?? b?.created_at ?? b?.date ?? b?.expense_date ?? ''));
-
-      if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) {
-        return bTime - aTime;
-      }
-
-      const aId = Number(a?.id ?? a?.expenseId ?? a?.expense_id);
-      const bId = Number(b?.id ?? b?.expenseId ?? b?.expense_id);
-
-      if (Number.isFinite(aId) && Number.isFinite(bId) && aId !== bId) {
-        return bId - aId;
-      }
-
-      return String(b?.id ?? b?.expenseId ?? b?.expense_id ?? '').localeCompare(
-        String(a?.id ?? a?.expenseId ?? a?.expense_id ?? '')
-      );
-    });
-  };
+  
 
   const loadCurrentUserId = useCallback(async () => {
     try {
       const storedUserId =
-        (await AsyncStorage.getItem('userId')) ??
-        (await AsyncStorage.getItem('user_id'));
+        (await AsyncStorage.getItem('userId'));
 
       if (storedUserId) {
         setCurrentUserId(String(storedUserId));
@@ -328,7 +224,7 @@ export default function GroupDetailsScreen() {
       }
 
       const normalized = sortRawExpensesByLatest(rawExpenses)
-        .map(normalizeExpense)
+        .map(exp => normalizeExpense(exp, group?.id ?? id))
         .filter((expense: Expense) => !!expense.id);
 
       setGroupExpenses(normalized);
@@ -407,42 +303,9 @@ export default function GroupDetailsScreen() {
   // BALANCE CALCULATIONS
   // ---------------------------
 
-  const groupBalance = useMemo(
-    () => {
-      const me = String(currentUserId || '');
-      if (!me) {
-        return { amount: 0, isYouOwing: false };
-      }
-
-      let totalOwed = 0;
-      let totalOwing = 0;
-
-      groupExpenses.forEach(expense => {
-        const mySplit = expense.splits.find(split => String(split.userId) === me);
-        const isYouPaid = String(expense.paidBy.id) === me;
-
-        if (isYouPaid) {
-          expense.splits.forEach(split => {
-            if (String(split.userId) !== me) {
-              totalOwed += Number(split.amount || 0);
-            }
-          });
-          return;
-        }
-
-        if (mySplit) {
-          totalOwing += Number(mySplit.amount || 0);
-        }
-      });
-
-      const net = totalOwed - totalOwing;
-      return {
-        amount: Math.abs(net),
-        isYouOwing: net < 0,
-      };
-    },
-    [currentUserId, groupExpenses]
-  );
+  const groupBalance = useMemo(() => {
+    return calculateGroupBalance(groupExpenses, currentUserId);
+  }, [groupExpenses, currentUserId]);
 
   const memberBalances = useMemo(
     () => {
