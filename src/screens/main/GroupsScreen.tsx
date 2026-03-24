@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,19 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabParamList, RootStackParamList } from '../../types/navigation';
+import { Expense } from '../../types';
 import Icon from 'react-native-vector-icons/Feather';
 import { Image } from 'react-native';
 import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
+import { expensesService } from '../../services/expensesService';
+import { calculateGroupBalance } from '../../utils/balance';
+import { normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
 import profileIcon from '../../../assets/ProfileIcon.png';
 
 type GroupsNavigationProp = CompositeNavigationProp<
@@ -27,6 +32,8 @@ export default function GroupsScreen() {
   const navigation = useNavigation<GroupsNavigationProp>();
 
   const [groups, setGroups] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
   const [showCreate, setShowCreate] = useState(false);
   const [groupName, setGroupName] = useState('');
@@ -170,15 +177,116 @@ export default function GroupsScreen() {
 
   }, []);
 
+  const loadExpenses = useCallback(async () => {
+    const loadByGroups = async () => {
+      try {
+        const groupsResponse = await groupsService.getGroups();
+        const groupsRaw = Array.isArray(groupsResponse)
+          ? groupsResponse
+          : Array.isArray(groupsResponse?.data)
+          ? groupsResponse.data
+          : Array.isArray(groupsResponse?.groups)
+          ? groupsResponse.groups
+          : [];
+
+        const groupedExpenses = await Promise.all(
+          groupsRaw.map(async (group: any) => {
+            const numericGroupId = Number(group?.id);
+            if (!Number.isFinite(numericGroupId)) {
+              return [];
+            }
+
+            try {
+              return await expensesService.getExpenses(numericGroupId);
+            } catch {
+              return [];
+            }
+          })
+        );
+
+        return groupedExpenses.flat();
+      } catch (error) {
+        console.log('Failed to load groups for expenses', error);
+        return [];
+      }
+    };
+
+    const normalizeList = (rawList: any[]): Expense[] => {
+      return sortRawExpensesByLatest(rawList)
+        .map(exp => normalizeExpense(exp))
+        .filter((expense: Expense) => !!expense.id);
+    };
+
+    try {
+      const direct = await expensesService.getExpenses();
+      const rawList = Array.isArray(direct) && direct.length > 0 ? direct : await loadByGroups();
+      setExpenses(normalizeList(rawList));
+    } catch (error) {
+      console.log('Failed to load expenses directly', error);
+      try {
+        const fallbackList = await loadByGroups();
+        setExpenses(normalizeList(fallbackList));
+      } catch (fallbackError) {
+        console.log('Failed to load expenses by group', fallbackError);
+        setExpenses([]);
+      }
+    }
+  }, []);
+
+  const loadCurrentUserId = useCallback(async () => {
+    try {
+      const storedIdRaw = await AsyncStorage.getItem('userId');
+      const normalizedId = storedIdRaw ? storedIdRaw.trim() : '';
+      setCurrentUserId(normalizedId);
+    } catch (error) {
+      console.log('Failed to load current user id', error);
+      setCurrentUserId('');
+    }
+  }, []);
+
   useEffect(() => {
     loadGroups();
   }, [loadGroups]);
 
+  useEffect(() => {
+    loadExpenses();
+  }, [loadExpenses]);
+
+  useEffect(() => {
+    loadCurrentUserId();
+  }, [loadCurrentUserId]);
+
   useFocusEffect(
     useCallback(() => {
       loadGroups();
-    }, [loadGroups])
+      loadExpenses();
+      loadCurrentUserId();
+    }, [loadGroups, loadExpenses, loadCurrentUserId])
   );
+
+  const groupBalances = useMemo(() => {
+    return groups.map(group => {
+      const groupId = String(group?.id ?? '');
+
+      const groupExpenses = expenses.filter(expense => {
+        const expenseGroupId = String(
+          expense?.groupId ??
+          (expense as any)?.group_id ??
+          (expense as any)?.group?.id ??
+          ''
+        );
+
+        return expenseGroupId === groupId;
+      });
+
+      const balance = calculateGroupBalance(groupExpenses, currentUserId);
+
+      return {
+        group,
+        balance,
+      };
+    });
+  }, [groups, expenses, currentUserId]);
 
   const handleCreateGroup = async () => {
 
@@ -235,9 +343,9 @@ export default function GroupsScreen() {
         </View>
 
         {/* Groups List */}
-        {groups.map((group) => {
-          const isOwing = group.isYouOwing;
-          const amount = Number(group.amount || 0);
+        {groupBalances.map(({ group, balance }) => {
+          const isOwing = balance.isYouOwing;
+          const amount = Number(balance.amount || 0);
 
           return (
             <TouchableOpacity
@@ -285,6 +393,12 @@ export default function GroupsScreen() {
                 </Text>
 
                 <View style={{ alignItems: 'flex-end' }}>
+                  {amount === 0 ? (
+                    <Text style={styles.settledText}>
+                      All settled up
+                    </Text>
+                  ) : null}
+
                   {amount !== 0 && (
                     <Text
                       style={[
@@ -296,11 +410,7 @@ export default function GroupsScreen() {
                     </Text>
                   )}
 
-                  {amount === 0 ? (
-                    <Text style={styles.settledText}>
-                      View group expenses
-                    </Text>
-                  ) : (
+                  {amount !== 0 && (
                     <Text
                       style={[
                         styles.balanceAmount,
@@ -309,7 +419,8 @@ export default function GroupsScreen() {
                     >
                       ${amount.toFixed(2)}
                     </Text>
-                  )}
+                     )}
+                 
                 </View>
               </View>
             </TouchableOpacity>
@@ -517,7 +628,8 @@ const styles = StyleSheet.create({
 
   settledText: {
     fontSize: 14,
-    color: '#6A7282',
+    color: '#009966',
+    fontWeight: '600',
   },
 
   overlay: {
