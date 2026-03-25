@@ -19,9 +19,11 @@ import { Image } from 'react-native';
 import deleteIcon from '../../../assets/delete.png';
 import editIcon from '../../../assets/edit.png';
 import Icon from 'react-native-vector-icons/Feather';
+import { useAppCurrency } from '../../context/CurrencyContext';
 
 export default function ExpensesScreen() {
   const navigation = useNavigation<any>();
+  const { currency, formatCurrency } = useAppCurrency();
 
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [backendGroups, setBackendGroups] = useState<any[]>([]);
@@ -446,7 +448,7 @@ return (
 
   <View style={styles.amountRow}>
     <Text style={styles.amount}>
-      ${item.amount.toFixed(2)}
+      {formatCurrency(item.amount)}
     </Text>
 
     <View style={{ position: 'relative' }}>
@@ -543,7 +545,8 @@ return (
         <Text style={styles.settledText}>Settled</Text>
       ) : (
         <Text style={isMyExpense ? styles.owedText : styles.oweText}>
-          {isMyExpense ? 'You are owed: ' : 'You owe: '} ${statusAmount.toFixed(2)}
+          {isMyExpense ? 'You are owed: ' : 'You owe: '}
+          {formatCurrency(statusAmount)}
         </Text>
       )}
     </View>
@@ -561,7 +564,7 @@ return (
     return (
       <View key={split.userId} style={styles.splitPill}>
         <Text style={styles.splitText}>
-          {memberName} ${split.amount.toFixed(2)}
+          {memberName} {formatCurrency(split.amount)}
         </Text>
       </View>
     );
@@ -627,7 +630,7 @@ return (
         {/* Amount */}
         <Text style={styles.label}>Amount</Text>
         <View style={styles.amountInputContainer}>
-          <Text style={styles.dollar}>$</Text>
+          <Text style={styles.dollar}>{currency.symbol}</Text>
           <TextInput
             value={editAmount}
             onChangeText={setEditAmount}
