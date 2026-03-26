@@ -25,6 +25,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabParamList, RootStackParamList } from '../../types/navigation';
 import profileIcon from '../../../assets/ProfileIcon.png';
+import { useAppCurrency } from '../../context/CurrencyContext';
 
 
 type DashboardNavigationProp = CompositeNavigationProp<
@@ -34,6 +35,7 @@ type DashboardNavigationProp = CompositeNavigationProp<
 
 export default function AddExpenseScreen() {
  const navigation = useNavigation<DashboardNavigationProp>();
+ const { currency, formatCurrency } = useAppCurrency();
 
   // ── backend data ──────────────────────────────────────────────────
   const [backendGroups, setBackendGroups] = useState<any[]>([]);
@@ -288,7 +290,9 @@ export default function AddExpenseScreen() {
         <Text style={styles.firstlable}>Amount</Text>
 
         <View style={styles.amountInput}>
-          <Icon name="dollar-sign" size={28} color="#6A7282" />
+          <Text style={{ fontSize: 28, color: '#6A7282', marginRight: 6 }}>
+            {currency.symbol}
+          </Text>
           <TextInput
             value={amount}
             onChangeText={setAmount}
@@ -479,7 +483,7 @@ export default function AddExpenseScreen() {
                 style={styles.splitRowItem}
               >
                 {renderSplitMember(m)}
-                <Text>${splitAmount}</Text>
+                <Text>{formatCurrency(parseFloat(splitAmount))}</Text>
               </View>
             ))}
           </View>
@@ -522,8 +526,8 @@ export default function AddExpenseScreen() {
                     : '#FF2056',
               }}
             >
-              ${exactTotal.toFixed(2)} /
-              ${amount || '0.00'}
+              {formatCurrency(exactTotal)} /
+              {formatCurrency(parseFloat(amount || '0'))}
             </Text>
           </View>
         )}
@@ -553,9 +557,12 @@ export default function AddExpenseScreen() {
                   }
                 />
                 <Text>
-                  $
-                  {getPercentageAmount(
-                    percentages[m.id]
+                  {formatCurrency(
+                    parseFloat(
+                      getPercentageAmount(
+                        percentages[m.id]
+                      )
+                    )
                   )}
                 </Text>
               </View>
