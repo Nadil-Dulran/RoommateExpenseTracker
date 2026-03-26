@@ -9,7 +9,6 @@ import {
   Modal,
   TextInput,
   Alert,
-  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -23,6 +22,7 @@ import { groupMembersService } from '../../services/groupMembersService';
 import { expensesService } from '../../services/expensesService';
 import { calculateGroupBalance } from '../../utils/balance';
 import { extractExpensesPayload, normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
+import { useAppCurrency } from '../../context/CurrencyContext';
 
 type RouteProps = RouteProp<RootStackParamList, 'GroupDetails'>;
 type NavProps = NativeStackNavigationProp<RootStackParamList>;
@@ -30,6 +30,7 @@ type NavProps = NativeStackNavigationProp<RootStackParamList>;
 export default function GroupDetailsScreen() {
   const route = useRoute<RouteProps>();
   const navigation = useNavigation<NavProps>();
+  const { formatCurrency } = useAppCurrency();
 
   const { id, group: routeGroup } = route.params;
 
@@ -605,12 +606,7 @@ const renderAvatar = (avatar?: string | any) => {
               },
             ]}
           >
-            <Text style={styles.memberAmount}>
-            <Text style={{ fontFamily: Platform.OS === 'android' ? 'monospace' : 'System' }}>
-              $
-           </Text>
-            {groupBalance.amount.toFixed(2)}
-          </Text>
+            <Text style={styles.memberAmount}>{formatCurrency(groupBalance.amount)}</Text>
           </Text>
 
           <Text
@@ -677,7 +673,7 @@ const renderAvatar = (avatar?: string | any) => {
                   },
                 ]}
               >
-                ${member.amount.toFixed(2)}
+                {formatCurrency(member.amount)}
               </Text>
 
               <TouchableOpacity
@@ -997,7 +993,7 @@ const renderAvatar = (avatar?: string | any) => {
             </Text>
 
             <Text style={styles.expenseAmountBelow}>
-              ${expense.amount.toFixed(2)}
+              {formatCurrency(expense.amount)}
             </Text>
           </View>
         ) : (
@@ -1007,7 +1003,7 @@ const renderAvatar = (avatar?: string | any) => {
             </Text>
 
             <Text style={styles.expenseAmount}>
-              ${expense.amount.toFixed(2)}
+              {formatCurrency(expense.amount)}
             </Text>
           </View>
         )}
@@ -1054,8 +1050,8 @@ const renderAvatar = (avatar?: string | any) => {
             ]}
           >
             {share.type === 'owed'
-              ? `You are owed: $${share.amount.toFixed(2)}`
-              : `You owe: $${share.amount.toFixed(2)}`}
+              ? `You are owed: ${formatCurrency(share.amount)}`
+              : `You owe: ${formatCurrency(share.amount)}`}
           </Text>
         )}
 
