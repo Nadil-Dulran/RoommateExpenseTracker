@@ -22,6 +22,7 @@ import { expensesService } from '../../services/expensesService';
 import { calculateGroupBalance } from '../../utils/balance';
 import { normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
 import profileIcon from '../../../assets/ProfileIcon.png';
+import { useAppCurrency } from '../../context/CurrencyContext';
 
 type GroupsNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BottomTabParamList, 'Groups'>,
@@ -30,6 +31,7 @@ type GroupsNavigationProp = CompositeNavigationProp<
 
 export default function GroupsScreen() {
   const navigation = useNavigation<GroupsNavigationProp>();
+  const { formatCurrency } = useAppCurrency();
 
   const [groups, setGroups] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -417,7 +419,7 @@ export default function GroupsScreen() {
                         { color: isOwing ? '#ff2056' : '#009966' },
                       ]}
                     >
-                      ${amount.toFixed(2)}
+                      {formatCurrency(amount)}
                     </Text>
                      )}
                  
