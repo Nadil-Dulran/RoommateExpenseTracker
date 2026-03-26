@@ -440,6 +440,12 @@ const handleDelete = (item: Expense) => {
     );
   };
 
+  const splitParticipantsForSettle = normalizedSplits.map(split => ({
+    userId: split.userId,
+    amount: roundCurrency(split.amount),
+    name: getSplitMemberName(String(split.userId)),
+  }));
+
 return (
   <View style={[styles.card,  activeMenuId === item.id && { zIndex: 999 } ]}>
     {/* Top Row */}
@@ -477,6 +483,18 @@ return (
                   memberName: counterpartyName,
                   isYouPaying: !isMyExpense,
                   groupId: String(item.groupId),
+                  expenseContext: {
+                    expenseId: String(item.id),
+                    description: item.description,
+                    amount: roundCurrency(item.amount),
+                    groupId: String(item.groupId ?? ''),
+                    groupName: group?.name,
+                    paidBy: {
+                      id: String(paidBy.id ?? ''),
+                      name: paidByName,
+                    },
+                    splits: splitParticipantsForSettle,
+                  },
                 });
               }}
               style={styles.menuItem}

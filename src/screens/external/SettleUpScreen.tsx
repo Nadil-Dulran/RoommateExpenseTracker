@@ -14,7 +14,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
 
-import { RootStackParamList } from '../../types/navigation';
+import { RootStackParamList, SettleUpExpenseContext } from '../../types/navigation';
 import { Expense } from '../../types';
 import { expensesService } from '../../services/expensesService';
 import { groupMembersService } from '../../services/groupMembersService';
@@ -140,6 +140,8 @@ export default function SettleUpScreen() {
 
   const mode = route.params.mode;
   const groupIdFromRoute = route.params.groupId;
+  const expenseContext: SettleUpExpenseContext | undefined =
+    mode === 'single' ? route.params.expenseContext : undefined;
 
   const [currentUserId, setCurrentUserId] = useState('');
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
@@ -229,6 +231,53 @@ export default function SettleUpScreen() {
     return map;
   }, [groupMembers, expenses]);
 
+  const expenseSpecificBalances = useMemo<MemberBalance[] | null>(() => {
+    if (!expenseContext || !currentUserId) {
+      return null;
+    }
+
+    const payerId = String(expenseContext.paidBy.id || '');
+    const me = String(currentUserId);
+    const entries: MemberBalance[] = [];
+
+    if (payerId === me) {
+      expenseContext.splits.forEach(split => {
+        const splitUserId = String(split.userId || '');
+        const splitAmount = Number(split.amount || 0);
+
+        if (!splitUserId || splitUserId === me || splitAmount <= 0) {
+          return;
+        }
+
+        entries.push({
+          id: splitUserId,
+          name: split.name ?? `Member ${splitUserId}`,
+          amount: roundCurrency(splitAmount),
+          isYouPaying: false,
+          groupId: expenseContext.groupId ?? groupIdFromRoute,
+        });
+      });
+
+      return entries.filter(member => member.amount >= 0.01);
+    }
+
+    const mySplit = expenseContext.splits.find(
+      split => String(split.userId || '') === me
+    );
+
+    if (mySplit && payerId) {
+      entries.push({
+        id: payerId,
+        name: expenseContext.paidBy.name || `Member ${payerId}`,
+        amount: roundCurrency(Number(mySplit.amount || 0)),
+        isYouPaying: true,
+        groupId: expenseContext.groupId ?? groupIdFromRoute,
+      });
+    }
+
+    return entries.filter(member => member.amount >= 0.01);
+  }, [expenseContext, currentUserId, groupIdFromRoute]);
+
   const allMemberTotals = useMemo<MemberBalance[]>(() => {
     if (!currentUserId) {
       return [];
@@ -301,6 +350,10 @@ export default function SettleUpScreen() {
   }, [currentUserId, expenses, groupIdFromRoute, memberNameMap]);
 
   const memberTotals = useMemo(() => {
+    if (expenseSpecificBalances && expenseSpecificBalances.length > 0) {
+      return expenseSpecificBalances;
+    }
+
     if (mode === 'single') {
       const selectedId = String(route.params.memberId);
       const fromBalances = allMemberTotals.find(member => String(member.id) === selectedId);
@@ -335,7 +388,67 @@ export default function SettleUpScreen() {
     }
 
     return allMemberTotals;
-  }, [mode, route.params, allMemberTotals, memberNameMap]);
+  }, [mode, route.params, allMemberTotals, memberNameMap, expenseSpecificBalances]);
+
+  const expenseParticipants = useMemo(
+    () => {
+      if (!expenseContext) {
+        return [];
+      }
+
+      return expenseContext.splits.map(split => {
+        const userId = String(split.userId || '');
+        return {
+          id: userId,
+          name:
+            split.name ??
+            memberNameMap.get(userId) ??
+            `Member ${userId}`,
+          amount: roundCurrency(Number(split.amount || 0)),
+          isCurrentUser:
+            !!currentUserId && userId === String(currentUserId),
+        };
+      });
+    },
+    [expenseContext, memberNameMap, currentUserId]
+  );
+
+  const expenseSummary = useMemo(() => {
+    if (!expenseContext || !expenseSpecificBalances || expenseSpecificBalances.length === 0) {
+      return null;
+    }
+
+    const oweEntries = expenseSpecificBalances.filter(member => member.isYouPaying);
+    const owedEntries = expenseSpecificBalances.filter(member => !member.isYouPaying);
+
+    if (oweEntries.length > 0) {
+      const total = oweEntries.reduce((sum, entry) => sum + entry.amount, 0);
+      return {
+        label: 'You owe',
+        amount: total,
+        subText:
+          oweEntries.length === 1
+            ? `to ${oweEntries[0].name}`
+            : `to ${oweEntries.length} people`,
+        color: '#ff2056',
+      };
+    }
+
+    if (owedEntries.length > 0) {
+      const total = owedEntries.reduce((sum, entry) => sum + entry.amount, 0);
+      return {
+        label: 'You are owed',
+        amount: total,
+        subText:
+          owedEntries.length === 1
+            ? `from ${owedEntries[0].name}`
+            : `from ${owedEntries.length} people`,
+        color: '#009966',
+      };
+    }
+
+    return null;
+  }, [expenseContext, expenseSpecificBalances]);
 
   const totalYouOwe = useMemo(() => {
     return memberTotals
@@ -441,7 +554,13 @@ export default function SettleUpScreen() {
 
           <View>
             <Text style={styles.title}>Settle Up</Text>
-            <Text style={styles.subtitle}>{groupIdFromRoute ? 'Balances for this group' : 'Simplified settlement plan'}</Text>
+            <Text style={styles.subtitle}>
+              {expenseContext
+                ? 'Only the people involved in this expense'
+                : groupIdFromRoute
+                ? 'Balances for this group'
+                : 'Simplified settlement plan'}
+            </Text>
           </View>
         </View>
 
@@ -464,12 +583,69 @@ export default function SettleUpScreen() {
           </View>
         )}
 
+        {expenseContext && (
+          <View style={styles.expenseMetaCard}>
+            <Text style={styles.expenseMetaTitle}>{expenseContext.description}</Text>
+            <Text style={styles.expenseMetaSub}>
+              {expenseContext.groupName ? `${expenseContext.groupName} • ` : ''}Paid by {expenseContext.paidBy.name}
+            </Text>
+          </View>
+        )}
+
+        {expenseContext && expenseSummary && (
+          <View
+            style={[
+              styles.summaryCard,
+              { backgroundColor: expenseSummary.color },
+            ]}
+          >
+            <Text style={styles.summaryLabel}>{expenseSummary.label}</Text>
+            <Text style={styles.summaryAmount}>{formatCurrency(expenseSummary.amount)}</Text>
+            <Text style={styles.summarySub}>{expenseSummary.subText}</Text>
+          </View>
+        )}
+
+        {expenseContext && expenseParticipants.length > 0 && (
+          <View style={styles.participantsCard}>
+            <Text style={styles.participantsTitle}>People in this expense</Text>
+            {expenseParticipants.map((participant, index) => (
+              <View
+                key={participant.id}
+                style={[
+                  styles.participantRow,
+                  index === expenseParticipants.length - 1 && { borderBottomWidth: 0 },
+                ]}
+              >
+                <View>
+                  <Text style={styles.participantName}>
+                    {participant.name}
+                    {participant.isCurrentUser ? ' (You)' : ''}
+                  </Text>
+                  <Text style={styles.participantMeta}>
+                    {participant.isCurrentUser ? 'Your share' : 'Share'}
+                  </Text>
+                </View>
+
+                <Text style={styles.participantAmount}>
+                  {formatCurrency(participant.amount)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         <View style={{ marginTop: 24 }}>
-          <Text style={styles.sectionTitle}>Balances by Person</Text>
+          <Text style={styles.sectionTitle}>
+            {expenseContext ? 'Settle this expense' : 'Balances by Person'}
+          </Text>
 
           {!loading && memberTotals.length === 0 && (
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>No unsettled balances found.</Text>
+              <Text style={styles.emptyText}>
+                {expenseContext
+                  ? 'Everyone is settled for this expense.'
+                  : 'No unsettled balances found.'}
+              </Text>
             </View>
           )}
 
@@ -618,6 +794,68 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginHorizontal: 20,
     marginBottom: 12,
+  },
+
+  expenseMetaCard: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    padding: 18,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+
+  expenseMetaTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+
+  expenseMetaSub: {
+    fontSize: 13,
+    color: '#6a7282',
+  },
+
+  participantsCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+
+  participantsTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+
+  participantRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f2f4f7',
+  },
+
+  participantName: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+
+  participantMeta: {
+    fontSize: 12,
+    color: '#98a2b3',
+  },
+
+  participantAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#101828',
   },
 
   emptyWrap: {

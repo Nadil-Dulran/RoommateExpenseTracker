@@ -1,3 +1,19 @@
+export type SettleUpExpenseSplit = {
+  userId: string;
+  amount: number;
+  name?: string;
+};
+
+export type SettleUpExpenseContext = {
+  expenseId: string;
+  description: string;
+  amount: number;
+  groupId?: string;
+  groupName?: string;
+  paidBy: { id: string; name: string };
+  splits: SettleUpExpenseSplit[];
+};
+
 export type RootStackParamList = {
   Login: undefined;
   Signup: undefined;
@@ -14,6 +30,7 @@ export type RootStackParamList = {
         groupId?: string;
         memberName?: string;
         isYouPaying?: boolean;
+        expenseContext?: SettleUpExpenseContext;
       };
 
   Notifications: undefined;
