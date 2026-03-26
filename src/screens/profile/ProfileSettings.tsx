@@ -43,7 +43,7 @@ export default function ProfileScreen() {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [avatarMimeType, setAvatarMimeType] = useState('image/jpeg');
-  const [avatarChanged, setAvatarChanged] = useState(false);
+  const [avatarBase64Payload, setAvatarBase64Payload] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     setSelectedCurrency(currency);
@@ -74,19 +74,6 @@ export default function ProfileScreen() {
     const compactBase64 = normalizedValue.replace(/\s/g, '');
 
     return `data:${mimeType || 'image/jpeg'};base64,${compactBase64}`;
-  };
-
-  const toBackendBase64 = (value?: string | null) => {
-    if (!value) {
-      return undefined;
-    }
-
-    if (value.startsWith('data:image')) {
-      const parts = value.split(',');
-      return parts.length > 1 ? parts[1] : undefined;
-    }
-
-    return value;
   };
 
   const showSuccessMessage = () => {
@@ -140,7 +127,6 @@ export default function ProfileScreen() {
 
     setAvatar(previewUri);
     setAvatarMimeType(selectedMimeType);
-    setAvatarChanged(true);
 
     try {
       setIsSaving(true);
@@ -156,12 +142,11 @@ export default function ProfileScreen() {
       await setCurrencyCode(selectedCurrency.code);
 
       setAvatar(toImageUri(updated.avatarBase64, selectedMimeType) || previewUri);
-      setAvatarChanged(false);
+      setAvatarBase64Payload(updated.avatarBase64 ?? rawBase64);
       showSuccessMessage();
     } catch (error) {
       console.log('Avatar update failed', error);
       setAvatar(previousAvatar);
-      setAvatarChanged(false);
 
       if (error instanceof Error && error.message === 'No auth token found') {
         Alert.alert('Session expired', 'Please login again.');
@@ -190,7 +175,7 @@ export default function ProfileScreen() {
       const data = await profileService.getProfile();
 
       setAvatar(toImageUri(data.avatarBase64, avatarMimeType));
-      setAvatarChanged(false);
+      setAvatarBase64Payload(data.avatarBase64 ?? undefined);
       setName(data.name || '');
       setEmail(data.email || '');
       setPhone(data.phone || '');
@@ -219,15 +204,16 @@ export default function ProfileScreen() {
     try {
       setIsSaving(true);
 
-      await profileService.updateProfile({
+      const payload = {
         name,
         email,
         phone,
         currency: selectedCurrency.code,
-        ...(avatarChanged && avatar ? { avatarBase64: toBackendBase64(avatar) } : {}),
-      });
+        ...(avatarBase64Payload ? { avatarBase64: avatarBase64Payload } : {}),
+      };
+
+      await profileService.updateProfile(payload);
       await setCurrencyCode(selectedCurrency.code);
-      setAvatarChanged(false);
       showSuccessMessage();
     } catch (error) {
       console.log('Update failed', error);
