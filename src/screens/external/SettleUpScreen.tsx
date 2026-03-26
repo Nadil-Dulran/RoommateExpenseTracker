@@ -18,6 +18,7 @@ import { RootStackParamList } from '../../types/navigation';
 import { Expense } from '../../types';
 import { expensesService } from '../../services/expensesService';
 import { groupMembersService } from '../../services/groupMembersService';
+import { useAppCurrency } from '../../context/CurrencyContext';
 
 type RouteProps = RouteProp<RootStackParamList, 'SettleUp'>;
 type NavigationProps = NativeStackNavigationProp<RootStackParamList>;
@@ -135,6 +136,7 @@ const normalizeExpense = (raw: any): Expense => {
 export default function SettleUpScreen() {
   const navigation = useNavigation<NavigationProps>();
   const route = useRoute<RouteProps>();
+  const { formatCurrency } = useAppCurrency();
 
   const mode = route.params.mode;
   const groupIdFromRoute = route.params.groupId;
@@ -457,7 +459,7 @@ export default function SettleUpScreen() {
             ]}
           >
             <Text style={styles.summaryLabel}>{summaryState.label}</Text>
-            <Text style={styles.summaryAmount}>${summaryState.amount.toFixed(2)}</Text>
+            <Text style={styles.summaryAmount}>{formatCurrency(summaryState.amount)}</Text>
             <Text style={styles.summarySub}>{summaryState.subText}</Text>
           </View>
         )}
@@ -514,7 +516,7 @@ export default function SettleUpScreen() {
                     },
                   ]}
                 >
-                  ${member.amount.toFixed(2)}
+                  {formatCurrency(member.amount)}
                 </Text>
 
                 <TouchableOpacity
@@ -545,7 +547,7 @@ export default function SettleUpScreen() {
 
             <Text style={styles.modalDesc}>
               {selectedMember?.isYouPaying
-                ? `Mark $${selectedMember?.amount.toFixed(2)} as paid?`
+                ? `Mark ${formatCurrency(selectedMember?.amount ?? 0)} as paid?`
                 : `Mark balance as received?`}
             </Text>
 
