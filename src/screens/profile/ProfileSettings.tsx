@@ -21,12 +21,8 @@ import helpIcon from '../../../assets/help.png';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { profileService } from '../../services/profileService';
 import {launchImageLibrary} from 'react-native-image-picker';
-
-const currencies = [
-  { code: 'USD', symbol: '$', name: 'US Dollar' },
-  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
-  { code: 'LKR', symbol: 'Rs.', name: 'Sri Lankan Rupee' },
-];
+import { currencies } from '../../constants/currencies';
+import { useAppCurrency } from '../../context/CurrencyContext';
 
 const AVATAR_COMPRESSION_QUALITY = 0.5;
 const AVATAR_MAX_WIDTH = 720;
@@ -35,11 +31,12 @@ const MAX_AVATAR_BASE64_BYTES = 700 * 1024;
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
+  const { currency, setCurrencyCode } = useAppCurrency();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [selectedCurrency, setSelectedCurrency] = useState(currencies[2]);
+  const [selectedCurrency, setSelectedCurrency] = useState(currency);
   const [showCurrencyModal, setShowCurrencyModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,6 +44,10 @@ export default function ProfileScreen() {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [avatarMimeType, setAvatarMimeType] = useState('image/jpeg');
   const [avatarChanged, setAvatarChanged] = useState(false);
+
+  useEffect(() => {
+    setSelectedCurrency(currency);
+  }, [currency]);
 
   const estimateBase64Bytes = (base64: string) => {
     const compact = base64.replace(/\s/g, '');
@@ -152,6 +153,8 @@ export default function ProfileScreen() {
         avatarBase64: rawBase64,
       });
 
+      await setCurrencyCode(selectedCurrency.code);
+
       setAvatar(toImageUri(updated.avatarBase64, selectedMimeType) || previewUri);
       setAvatarChanged(false);
       showSuccessMessage();
@@ -196,6 +199,7 @@ export default function ProfileScreen() {
 
       if (currency) {
         setSelectedCurrency(currency);
+        await setCurrencyCode(currency.code);
       }
     } catch (error) {
       console.log('Failed to load profile', error);
@@ -222,6 +226,7 @@ export default function ProfileScreen() {
         currency: selectedCurrency.code,
         ...(avatarChanged && avatar ? { avatarBase64: toBackendBase64(avatar) } : {}),
       });
+      await setCurrencyCode(selectedCurrency.code);
       setAvatarChanged(false);
       showSuccessMessage();
     } catch (error) {
