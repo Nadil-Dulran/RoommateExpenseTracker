@@ -7,6 +7,7 @@ import {
   Modal,
   TextInput,
   Pressable,
+  Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -20,6 +21,75 @@ import deleteIcon from '../../../assets/delete.png';
 import editIcon from '../../../assets/edit.png';
 import Icon from 'react-native-vector-icons/Feather';
 import { useAppCurrency } from '../../context/CurrencyContext';
+import profileIcon from '../../../assets/ProfileIcon.png';
+
+type SplitMode = 'equal' | 'exact' | 'percentage';
+
+interface GroupMember {
+  id: string;
+  name: string;
+  avatarUri?: string | null;
+}
+
+const toImageUri = (value?: string | null, mimeType = 'image/jpeg') => {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://') ||
+    normalized.startsWith('data:image')
+  ) {
+    return normalized;
+  }
+
+  const compact = normalized.replace(/\s/g, '');
+  return `data:${mimeType};base64,${compact}`;
+};
+
+const renderAvatar = (avatar?: string | null) => {
+  if (typeof avatar === 'number') {
+    return avatar;
+  }
+
+  const uri = toImageUri(avatar);
+  if (uri) {
+    return { uri } as const;
+  }
+
+  return profileIcon;
+};
+
+const resolveSplitMemberName = (
+  splitUserId: string,
+  currentUserId: string,
+  paidById: string,
+  paidByName: string,
+  members: GroupMember[]
+) => {
+  if (!splitUserId) {
+    return 'Unknown';
+  }
+
+  if (splitUserId === currentUserId) {
+    return 'You';
+  }
+
+  if (splitUserId === paidById) {
+    return paidByName || `User ${splitUserId}`;
+  }
+
+  return (
+    members.find(member => String(member.id) === String(splitUserId))?.name ??
+    `User ${splitUserId}`
+  );
+};
 
 export default function ExpensesScreen() {
   const navigation = useNavigation<any>();
@@ -34,11 +104,18 @@ export default function ExpensesScreen() {
 
   const [editDescription, setEditDescription] = useState('');
   const [editAmount, setEditAmount] = useState('');
+  const [splitType, setSplitType] = useState<SplitMode>('equal');
+  const [editExactSplits, setEditExactSplits] = useState<Record<string, string>>({});
+  const [editPercentageSplits, setEditPercentageSplits] = useState<Record<string, string>>({});
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
   const roundCurrency = (value: number) => {
     return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
   };
+
+  const isSettlementDescription = (value?: string | null) =>
+    String(value || '').trim().toLowerCase() === 'settlement';
 
 
 
@@ -69,14 +146,34 @@ const handleDelete = (item: Expense) => {
     }
   }, []);
 
+  const normalizeMember = (member: any): GroupMember => {
+    const avatarValue =
+      member?.avatarBase64 ??
+      null;
+
+    const avatarMimeType =
+      member?.avatarMimeType ??
+      member?.avatar_mime_type ??
+      member?.mimeType ??
+      'image/jpeg';
+
+    return {
+      id: String(member?.id ?? member?.user_id ?? member?.userId ?? ''),
+      name:
+        member?.name ??
+        'Unknown',
+      avatarUri: toImageUri(avatarValue, avatarMimeType),
+    };
+  };
+
   const normalizeGroupInfo = (group: any) => ({
     id: String(group?.id ?? ''),
     name: group?.name || 'Untitled Group',
     emoji: group?.emoji || '👥',
     members: Array.isArray(group?.members)
-      ? group.members
+      ? group.members.map(normalizeMember)
       : Array.isArray(group?.users)
-      ? group.users
+      ? group.users.map(normalizeMember)
       : [],
   });
 
@@ -86,15 +183,6 @@ const handleDelete = (item: Expense) => {
     if (Array.isArray(data?.members)) { return data.members; }
     return [];
   };
-
-  const normalizeMember = (member: any) => ({
-    id: String(member?.id ?? member?.user_id ?? member?.userId ?? ''),
-    name:
-      member?.name ??
-      member?.user?.name ??
-      member?.full_name ??
-      'Unknown',
-  });
 
   const normalizeExpense = (raw: any): Expense => {
     const getSplitUserId = (split: any) => {
@@ -118,6 +206,21 @@ const handleDelete = (item: Expense) => {
         split?.split_amount ??
         0
       );
+    };
+
+    const getSplitPercentage = (split: any) => {
+      const value =
+        split?.percentage ??
+        split?.percent ??
+        split?.percentageShare ??
+        split?.percentage_share ??
+        split?.sharePercentage ??
+        split?.share_percentage ??
+        split?.split_percentage ??
+        split?.percentageSplit ??
+        split?.percentage_split;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
     };
 
     const splitsRaw = Array.isArray(raw?.splits)
@@ -150,9 +253,30 @@ const handleDelete = (item: Expense) => {
       .map((split: any) => {
         const userId = getSplitUserId(split);
         const amount = getSplitAmount(split);
-        return { userId, amount };
+        const percentage = getSplitPercentage(split);
+        return percentage != null ? { userId, amount, percentage } : { userId, amount };
       })
       .filter((split: { userId: string; amount: number }) => !!split.userId && split.amount > 0);
+
+    const resolveSplitType = (): Expense['splitType'] => {
+      const rawType =
+        raw?.splitType ??
+        raw?.split_type ??
+        raw?.splitMode ??
+        raw?.split_mode ??
+        raw?.splitStrategy ??
+        raw?.split_strategy ??
+        '';
+
+      if (typeof rawType === 'string') {
+        const normalized = rawType.trim().toLowerCase();
+        if (normalized === 'equal' || normalized === 'exact' || normalized === 'percentage') {
+          return normalized as Expense['splitType'];
+        }
+      }
+
+      return undefined;
+    };
 
     return {
       id: String(raw?.id ?? raw?.expenseId ?? raw?.expense_id ?? ''),
@@ -173,6 +297,7 @@ const handleDelete = (item: Expense) => {
           'Unknown',
       },
       splits: processedSplits,
+      splitType: resolveSplitType(),
     };
   };
 
@@ -317,6 +442,196 @@ const handleDelete = (item: Expense) => {
     }, [loadCurrentUserId, loadExpenses, loadGroups])
   );
 
+  const selectedGroupMembers = useMemo<GroupMember[]>(() => {
+    if (!selectedExpense) {
+      return [];
+    }
+
+    const groupInfo = getGroupInfo(selectedExpense.groupId);
+    if (!groupInfo?.members) {
+      return [];
+    }
+
+    return groupInfo.members.map((member: GroupMember | any) => ({
+      id: String(member?.id ?? ''),
+      name: member?.name ?? `User ${member?.id ?? ''}`,
+      avatarUri: member?.avatarUri ?? null,
+    }));
+  }, [selectedExpense, backendGroups]);
+
+  const fallbackParticipants = useMemo<GroupMember[]>(() => {
+    if (!selectedExpense) {
+      return [];
+    }
+
+    const unique = new Map<string, GroupMember>();
+    selectedExpense.splits.forEach(split => {
+      unique.set(String(split.userId), {
+        id: String(split.userId),
+        name: `User ${split.userId}`,
+        avatarUri: null,
+      });
+    });
+    return Array.from(unique.values());
+  }, [selectedExpense]);
+
+  const editParticipants = useMemo<GroupMember[]>(() => {
+    return selectedGroupMembers.length > 0
+      ? selectedGroupMembers
+      : fallbackParticipants;
+  }, [selectedGroupMembers, fallbackParticipants]);
+
+  const normalizedEditAmountValue = useMemo(() => parseFloat(editAmount) || 0, [editAmount]);
+
+  const equalShareAmount = useMemo(() => {
+    if (!editParticipants.length) {
+      return 0;
+    }
+    return normalizedEditAmountValue / editParticipants.length;
+  }, [normalizedEditAmountValue, editParticipants.length]);
+
+  const exactSplitsTotal = useMemo(() => {
+    return Object.values(editExactSplits).reduce((sum, value) => sum + (parseFloat(value) || 0), 0);
+  }, [editExactSplits]);
+
+  const percentageSplitsTotal = useMemo(() => {
+    return Object.values(editPercentageSplits).reduce((sum, value) => sum + (parseFloat(value) || 0), 0);
+  }, [editPercentageSplits]);
+
+  const percentageAmountMap = useMemo(() => {
+    return editParticipants.reduce<Record<string, number>>((acc, member) => {
+      const percent = parseFloat(editPercentageSplits[member.id] || '0');
+      acc[member.id] = (normalizedEditAmountValue * percent) / 100;
+      return acc;
+    }, {});
+  }, [editParticipants, editPercentageSplits, normalizedEditAmountValue]);
+
+  useEffect(() => {
+    if (!selectedExpense) {
+      setEditDescription('');
+      setEditAmount('');
+      setSplitType('equal');
+      setEditExactSplits({});
+      setEditPercentageSplits({});
+      return;
+    }
+
+    setEditDescription(selectedExpense.description);
+    setEditAmount(selectedExpense.amount.toFixed(2));
+
+    const exactMap: Record<string, string> = {};
+    selectedExpense.splits.forEach(split => {
+      exactMap[String(split.userId)] = split.amount.toFixed(2);
+    });
+    setEditExactSplits(exactMap);
+
+    const percentageMap: Record<string, string> = {};
+    let hasExplicitPercentages = true;
+    selectedExpense.splits.forEach(split => {
+      if (typeof split.percentage === 'number' && Number.isFinite(split.percentage)) {
+        percentageMap[String(split.userId)] = split.percentage.toString();
+      } else {
+        hasExplicitPercentages = false;
+      }
+    });
+
+    if (!hasExplicitPercentages) {
+      const total = selectedExpense.amount || 0;
+      selectedExpense.splits.forEach(split => {
+        const percent = total === 0 ? 0 : (split.amount / total) * 100;
+        percentageMap[String(split.userId)] = percent.toFixed(2);
+      });
+    }
+
+    setEditPercentageSplits(percentageMap);
+
+    if (selectedExpense.splitType && ['equal', 'exact', 'percentage'].includes(selectedExpense.splitType)) {
+      setSplitType(selectedExpense.splitType as SplitMode);
+      return;
+    }
+
+    if (hasExplicitPercentages) {
+      setSplitType('percentage');
+      return;
+    }
+
+    const participantCount = selectedExpense.splits.length || 1;
+    const equalShare = participantCount > 0 ? selectedExpense.amount / participantCount : selectedExpense.amount;
+    const allEqual = selectedExpense.splits.every(split => Math.abs(split.amount - equalShare) < 0.01);
+    setSplitType(allEqual ? 'equal' : 'exact');
+  }, [selectedExpense]);
+
+  useEffect(() => {
+    if (!editParticipants.length) {
+      return;
+    }
+
+    setEditExactSplits(prev => {
+      let mutated = false;
+      const next = { ...prev };
+      editParticipants.forEach(member => {
+        if (next[member.id] == null) {
+          next[member.id] = '0';
+          mutated = true;
+        }
+      });
+      return mutated ? next : prev;
+    });
+
+    setEditPercentageSplits(prev => {
+      let mutated = false;
+      const next = { ...prev };
+      editParticipants.forEach(member => {
+        if (next[member.id] == null) {
+          next[member.id] = '0';
+          mutated = true;
+        }
+      });
+      return mutated ? next : prev;
+    });
+  }, [editParticipants]);
+
+  const handleSplitModeChange = (mode: SplitMode) => {
+    setSplitType(mode);
+
+    if (mode === 'exact') {
+      setEditExactSplits(prev => {
+        const next = { ...prev };
+        editParticipants.forEach(member => {
+          if (next[member.id] == null) {
+            next[member.id] = '0';
+          }
+        });
+        return next;
+      });
+    }
+
+    if (mode === 'percentage') {
+      setEditPercentageSplits(prev => {
+        const next = { ...prev };
+        if (Object.keys(next).length === 0 && editParticipants.length > 0) {
+          const equalPercent = Number((100 / editParticipants.length).toFixed(2));
+          editParticipants.forEach(member => {
+            next[member.id] = equalPercent.toString();
+          });
+        } else {
+          editParticipants.forEach(member => {
+            if (next[member.id] == null) {
+              next[member.id] = '0';
+            }
+          });
+        }
+        return next;
+      });
+    }
+  };
+
+  const dismissEditModal = () => {
+    setShowEditModal(false);
+    setSelectedExpense(null);
+    setActiveMenuId(null);
+  };
+
 
   const confirmDelete = async () => {
     if (!selectedExpense) return;
@@ -329,16 +644,95 @@ const handleDelete = (item: Expense) => {
   };
 
   const confirmEdit = async () => {
-    if (!selectedExpense) return;
+    if (!selectedExpense) {
+      return;
+    }
 
-    await expensesService.updateExpense(parseInt(selectedExpense.id, 10), {
-      description: editDescription,
-      amount: parseFloat(editAmount),
-    });
+    if (!editParticipants.length) {
+      Alert.alert('Members unavailable', 'Unable to load participants for this expense. Please try again.');
+      return;
+    }
 
-    setShowEditModal(false);
-    setSelectedExpense(null);
-    await loadExpenses();
+    if (!editDescription.trim()) {
+      Alert.alert('Missing description', 'Please enter a description for this expense.');
+      return;
+    }
+
+    const normalizedAmount = parseFloat(editAmount);
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      Alert.alert('Invalid amount', 'Enter a valid amount greater than zero.');
+      return;
+    }
+
+    let splitPayload: { userId: string; amount: number; percentage?: number }[] = [];
+
+    if (splitType === 'equal') {
+      const memberCount = editParticipants.length;
+      if (memberCount === 0) {
+        Alert.alert('Split error', 'No members available for equal split.');
+        return;
+      }
+
+      const baseShare = roundCurrency(normalizedAmount / memberCount);
+      let remaining = roundCurrency(normalizedAmount);
+
+      splitPayload = editParticipants.map((member, index) => {
+        const isLast = index === memberCount - 1;
+        const amount = isLast ? roundCurrency(remaining) : baseShare;
+        remaining = roundCurrency(remaining - amount);
+        return {
+          userId: String(member.id),
+          amount,
+        };
+      });
+    } else if (splitType === 'exact') {
+      splitPayload = editParticipants.map(member => {
+        const parsedAmount = parseFloat(editExactSplits[member.id] || '0');
+        const safeAmount = Number.isFinite(parsedAmount) ? parsedAmount : 0;
+        return {
+          userId: String(member.id),
+          amount: roundCurrency(safeAmount),
+        };
+      });
+
+      const exactTotal = splitPayload.reduce((sum, split) => sum + split.amount, 0);
+      if (Math.abs(exactTotal - normalizedAmount) > 0.01) {
+        Alert.alert('Split mismatch', 'Exact amounts must add up to the total.');
+        return;
+      }
+    } else {
+      splitPayload = editParticipants.map(member => {
+        const parsedPercent = parseFloat(editPercentageSplits[member.id] || '0');
+        const percent = Number.isFinite(parsedPercent) ? parsedPercent : 0;
+        return {
+          userId: String(member.id),
+          percentage: percent,
+          amount: roundCurrency((normalizedAmount * percent) / 100),
+        };
+      });
+
+      if (Math.abs(percentageSplitsTotal - 100) > 0.1) {
+        Alert.alert('Split mismatch', 'Percentages must add up to 100%.');
+        return;
+      }
+    }
+
+    setIsSavingEdit(true);
+    try {
+      await expensesService.updateExpense(parseInt(selectedExpense.id, 10), {
+        description: editDescription.trim(),
+        amount: normalizedAmount,
+        splitType,
+        splits: splitPayload,
+      });
+
+      dismissEditModal();
+      await loadExpenses();
+    } catch (error: any) {
+      Alert.alert('Failed to update expense', error?.message ?? 'Unknown error');
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   const memberNetByGroup = useMemo(() => {
@@ -384,6 +778,10 @@ const handleDelete = (item: Expense) => {
     return netMap;
   }, [expenses, currentUserId]);
 
+  const visibleExpenses = useMemo(() => {
+    return expenses.filter(expense => !isSettlementDescription(expense.description));
+  }, [expenses]);
+
 
   const renderExpense = ({ item }: { item: Expense }) => {
   const splits = Array.isArray(item.splits) ? item.splits : [];
@@ -411,7 +809,7 @@ const handleDelete = (item: Expense) => {
     .reduce((sum, split) => sum + split.amount, 0);
 
   const statusAmount = roundCurrency(isMyExpense ? amountYouAreOwed : myShareAmount);
-  const isSettlementEntry = String(item.description || '').trim().toLowerCase() === 'settlement';
+  const isSettlementEntry = isSettlementDescription(item.description);
   const counterpartyId =
     isMyExpense
       ? normalizedSplits.find(split => String(split.userId) !== String(resolvedCurrentUserId))?.userId ?? ''
@@ -425,25 +823,19 @@ const handleDelete = (item: Expense) => {
   const isSettledWithCounterparty =
     !!counterpartyId && Math.abs(roundCurrency(netWithCounterparty)) < 0.01;
 
-  const getSplitMemberName = (splitUserId: string) => {
-    if (String(splitUserId) === String(resolvedCurrentUserId)) {
-      return 'You';
-    }
-
-    if (String(splitUserId) === String(paidBy.id)) {
-      return paidByName;
-    }
-
-    return (
-      group?.members?.find((member: any) => String(member.id) === String(splitUserId))?.name ??
-      `User ${splitUserId}`
+  const splitParticipantName = (splitUserId: string) =>
+    resolveSplitMemberName(
+      String(splitUserId),
+      resolvedCurrentUserId,
+      String(paidBy.id ?? ''),
+      paidByName,
+      (group?.members ?? []) as GroupMember[]
     );
-  };
 
   const splitParticipantsForSettle = normalizedSplits.map(split => ({
     userId: split.userId,
     amount: roundCurrency(split.amount),
-    name: getSplitMemberName(String(split.userId)),
+    name: splitParticipantName(String(split.userId)),
   }));
 
 return (
@@ -577,7 +969,7 @@ return (
   <Text style={styles.metaLight}>Split:</Text>
 
   {normalizedSplits.map(split => {
-    const memberName = getSplitMemberName(String(split.userId));
+    const memberName = splitParticipantName(String(split.userId));
 
     return (
       <View key={split.userId} style={styles.splitPill}>
@@ -595,13 +987,13 @@ return (
     <View style={styles.container}>
        <Text style={styles.header}>All Expenses</Text>
       <Text style={styles.subHeader}>
-        {expenses.length} total
+        {visibleExpenses.length} total
       </Text>
       
 <View style={{ flex: 1 }}>
 
 <FlatList
-  data={expenses}
+  data={visibleExpenses}
   keyExtractor={item => String(item.id)}
   renderItem={renderExpense}
   removeClippedSubviews={false}
@@ -628,50 +1020,188 @@ return (
   <View style={styles.modalOverlay}>
     <View style={styles.editCard}>
 
-      {/* Header */}
-      <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Edit Expense</Text>
-        <Pressable onPress={() => setShowEditModal(false)}>
-          <Icon name="x" size={20} color="#6A7282" />
-        </Pressable>
-      </View>
+ {/* Header */}
+<View style={styles.modalHeader}>
+  <Text style={styles.modalTitlee}>Edit Expense</Text>
+  <Pressable onPress={dismissEditModal}>
+    <Icon name="x" size={22} color="#6A7282" />
+  </Pressable>
+</View>
 
+{/* Description */}
+<Text style={styles.labell}>Description</Text>
+<TextInput
+  value={editDescription}
+  onChangeText={setEditDescription}
+  style={styles.inputt}
+/>
 
-        {/* Description */}
-        <Text style={styles.label}>Description</Text>
-        <TextInput
-          value={editDescription}
-          onChangeText={setEditDescription}
-          style={styles.input}
-        />
+{/* Amount */}
+<Text style={styles.labell}>Amount</Text>
+<View style={styles.amountInputContainer}>
+  <Text style={styles.dollar}>{currency.symbol}</Text>
+  <TextInput
+    value={editAmount}
+    onChangeText={setEditAmount}
+    keyboardType="decimal-pad"
+    style={styles.amountInput}
+  />
+</View>
 
-        {/* Amount */}
-        <Text style={styles.label}>Amount</Text>
-        <View style={styles.amountInputContainer}>
-          <Text style={styles.dollar}>{currency.symbol}</Text>
-          <TextInput
-            value={editAmount}
-            onChangeText={setEditAmount}
-            keyboardType="numeric"
-            style={styles.amountInput}
-          />
-        </View>
+{/* Split */}
+<Text style={styles.labell}>Split</Text>
 
-      {/* Buttons */}
-      <View style={styles.modalActions}>
-        <Pressable
-          style={styles.cancelBtn}
-          onPress={() => setShowEditModal(false)}
-        >
-          <Text style={{ fontWeight: '600' }}>Cancel</Text>
-        </Pressable>
+<View style={styles.splitToggleRow}>
+  {['equal', 'exact', 'percentage'].map(type => (
+    <Pressable
+      key={type}
+      onPress={() => handleSplitModeChange(type as SplitMode)}
+      style={[
+        styles.splitToggleBtn,
+        splitType === type && styles.activeSplitToggle,
+      ]}
+    >
+      <Text
+        style={[
+          styles.splitToggleText,
+          splitType === type && styles.activeSplitText,
+        ]}
+      >
+        {type === 'equal'
+          ? 'Equal'
+          : type === 'exact'
+          ? 'Exact'
+          : '%'}
+      </Text>
+    </Pressable>
+  ))}
+</View>
 
-        <Pressable style={styles.saveBtn} onPress={confirmEdit}>
-          <Text style={{ color: 'white', fontWeight: '600' }}>
-            Save Changes
+{/* Split Preview Box */}
+<View style={styles.splitPreview}>
+  <Text style={styles.splitPreviewTitle}>
+    {splitType === 'equal'
+      ? 'Split equally:'
+      : splitType === 'exact'
+      ? 'Enter exact amounts:'
+      : 'Enter percentages:'}
+  </Text>
+
+  {editParticipants.length === 0 ? (
+    <Text style={styles.metaLight}>No participants found for this expense.</Text>
+  ) : (
+    <>
+      {splitType === 'equal' &&
+        editParticipants.map(member => (
+          <View key={member.id} style={styles.splitRowItem}>
+            <View style={styles.splitLeft}>
+              <Image source={renderAvatar(member.avatarUri)} style={styles.splitAvatar} />
+              <Text style={styles.splitName}>{member.name}</Text>
+            </View>
+            <View style={styles.splitRowRight}>
+              <Text style={styles.splitAmount}>
+                {currency.symbol}
+                {roundCurrency(equalShareAmount || 0).toFixed(2)}
+              </Text>
+            </View>
+          </View>
+        ))}
+
+      {splitType === 'exact' && (
+        <>
+          {editParticipants.map(member => (
+            <View key={member.id} style={styles.splitRowItem}>
+              <View style={styles.splitLeft}>
+                <Image source={renderAvatar(member.avatarUri)} style={styles.splitAvatar} />
+                <Text style={styles.splitName}>{member.name}</Text>
+              </View>
+              <View style={styles.splitRowRight}>
+                <TextInput
+                  style={styles.splitInput}
+                  keyboardType="decimal-pad"
+                  value={editExactSplits[member.id] ?? '0'}
+                  onChangeText={value =>
+                    setEditExactSplits(prev => ({
+                      ...prev,
+                      [member.id]: value,
+                    }))
+                  }
+                />
+              </View>
+            </View>
+          ))}
+          <Text
+            style={[
+              styles.splitSummaryText,
+              Math.abs(exactSplitsTotal - normalizedEditAmountValue) < 0.01
+                ? styles.splitSummarySuccess
+                : styles.splitSummaryError,
+            ]}
+          >
+            {formatCurrency(exactSplitsTotal)} / {formatCurrency(normalizedEditAmountValue)}
           </Text>
-        </Pressable>
-      </View>
+        </>
+      )}
+
+      {splitType === 'percentage' && (
+        <>
+          {editParticipants.map(member => (
+            <View key={member.id} style={styles.splitRowItem}>
+              <View style={styles.splitLeft}>
+                <Image source={renderAvatar(member.avatarUri)} style={styles.splitAvatar} />
+                <Text style={styles.splitName}>{member.name}</Text>
+              </View>
+              <View style={styles.splitRowRight}>
+                <View style={styles.percentageInputGroup}>
+                  <TextInput
+                    style={styles.percentageInput}
+                    keyboardType="decimal-pad"
+                    value={editPercentageSplits[member.id] ?? '0'}
+                    onChangeText={value =>
+                      setEditPercentageSplits(prev => ({
+                        ...prev,
+                        [member.id]: value,
+                      }))
+                    }
+                  />
+                  <Text style={styles.percentageSuffix}>%</Text>
+                </View>
+                <Text style={styles.splitAmount}>
+                  {currency.symbol}
+                  {roundCurrency(percentageAmountMap[member.id] ?? 0).toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          ))}
+          <Text
+            style={[
+              styles.splitSummaryText,
+              Math.abs(percentageSplitsTotal - 100) < 0.1
+                ? styles.splitSummarySuccess
+                : styles.splitSummaryError,
+            ]}
+          >
+            {percentageSplitsTotal.toFixed(2)}% / 100%
+          </Text>
+        </>
+      )}
+    </>
+  )}
+</View>
+
+<View style={styles.modalActions}>
+  <Pressable style={styles.cancelBtn} onPress={dismissEditModal}>
+    <Text style={styles.cancel}>Cancel</Text>
+  </Pressable>
+
+  <Pressable
+    style={[styles.saveBtn, isSavingEdit && { opacity: 0.6 }]}
+    onPress={confirmEdit}
+    disabled={isSavingEdit}
+  >
+    <Text style={styles.save}>{isSavingEdit ? 'Saving...' : 'Save Changes'}</Text>
+  </Pressable>
+</View>
     </View>
   </View>
 </Modal>
@@ -719,6 +1249,7 @@ return (
 </View>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -896,7 +1427,7 @@ splitStackItem: {
     fontWeight: '600',
   },
   save: {
-    color: '#009966',
+    color: '#FFFFFF',
     fontWeight: '700',
   },
   delete: {
@@ -963,10 +1494,189 @@ modalOverlay: {
 },
 
 editCard: {
-  backgroundColor: '#FFF',
-  borderRadius: 24,
+  backgroundColor: '#fff',
+  borderRadius: 28,
   padding: 20,
   maxHeight: '85%',
+},
+
+modalTitlee: {
+  fontSize: 22,
+  fontWeight: '700',
+  color: '#101828',
+},
+
+labell: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#344054',
+  marginTop: 18,
+  marginBottom: 8,
+},
+
+inputt: {
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 16,
+  padding: 14,
+  fontSize: 15,
+},
+
+amountInputContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 16,
+  paddingHorizontal: 14,
+},
+
+dollar: {
+  marginRight: 6,
+  fontSize: 16,
+},
+
+amountInput: {
+  flex: 1,
+  paddingVertical: 12,
+  fontSize: 15,
+},
+
+/* Split Toggle */
+splitToggleRow: {
+  flexDirection: 'row',
+  gap: 10,
+  marginTop: 6,
+},
+
+splitToggleBtn: {
+  flex: 1,
+  paddingVertical: 12,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  alignItems: 'center',
+},
+
+activeSplitToggle: {
+  backgroundColor: '#E6F4EC',
+  borderColor: '#009966',
+},
+
+splitToggleText: {
+  color: '#6A7282',
+  fontWeight: '500',
+},
+
+activeSplitText: {
+  color: '#009966',
+  fontWeight: '600',
+},
+
+/* Split Preview */
+splitPreview: {
+  marginTop: 14,
+  backgroundColor: '#F9FAFB',
+  borderRadius: 18,
+  padding: 14,
+},
+
+splitPreviewTitle: {
+  fontSize: 13,
+  color: '#6A7282',
+  marginBottom: 10,
+},
+
+splitRowItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  marginBottom: 10,
+},
+
+splitLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  flex: 1,
+  marginRight: 12,
+},
+
+splitAvatar: {
+  width: 28,
+  height: 28,
+  borderRadius: 14,
+  marginRight: 8,
+},
+
+splitName: {
+  fontSize: 14,
+  color: '#101828',
+},
+
+splitAmount: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: '#101828',
+},
+
+splitRowRight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 12,
+},
+
+splitInput: {
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 12,
+  paddingVertical: 8,
+  paddingHorizontal: 12,
+  minWidth: 90,
+  backgroundColor: '#FFFFFF',
+  textAlign: 'right',
+  fontSize: 14,
+},
+
+splitSummaryText: {
+  marginTop: 6,
+  fontSize: 12,
+  fontWeight: '600',
+  textAlign: 'right',
+},
+
+splitSummarySuccess: {
+  color: '#12B76A',
+},
+
+splitSummaryError: {
+  color: '#F04438',
+},
+
+
+percentageInputGroup: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 12,
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  backgroundColor: '#FFFFFF',
+  minWidth: 95,
+  justifyContent: 'flex-end',
+},
+
+percentageInput: {
+  minWidth: 50,
+  paddingVertical: 4,
+  textAlign: 'right',
+},
+
+percentageSuffix: {
+  marginLeft: 4,
+  color: '#6A7282',
+  fontWeight: '600',
 },
 
 modalHeader: {
@@ -980,24 +1690,6 @@ label: {
   marginBottom: 6,
   fontWeight: '500',
   marginTop: 15,
-},
-
-amountInputContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  borderWidth: 1,
-  borderColor: '#E5E7EB',
-  borderRadius: 12,
-  paddingHorizontal: 12,
-},
-
-dollar: {
-  marginRight: 4,
-},
-
-amountInput: {
-  flex: 1,
-  paddingVertical: 10,
 },
 
 modalActions: {
