@@ -12,7 +12,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Expense } from '../../types';
+import { Expense, Settlement } from '../../types';
 import { expensesService } from '../../services/expensesService';
 import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
@@ -22,6 +22,11 @@ import editIcon from '../../../assets/edit.png';
 import Icon from 'react-native-vector-icons/Feather';
 import { useAppCurrency } from '../../context/CurrencyContext';
 import profileIcon from '../../../assets/ProfileIcon.png';
+import { settlementService } from '../../services/settlementService';
+import {
+  extractSettlementsPayload,
+  normalizeSettlement,
+} from '../../utils/settlements';
 
 type SplitMode = 'equal' | 'exact' | 'percentage';
 
@@ -30,6 +35,26 @@ interface GroupMember {
   name: string;
   avatarUri?: string | null;
 }
+
+const CATEGORY_KEYS: Expense['category'][] = [
+  'food',
+  'travel',
+  'utilities',
+  'shopping',
+  'entertainment',
+  'other',
+];
+
+const normalizeCategoryType = (value?: string | null): Expense['category'] => {
+  if (!value) {
+    return 'other';
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  return CATEGORY_KEYS.includes(normalized as Expense['category'])
+    ? (normalized as Expense['category'])
+    : 'other';
+};
 
 const toImageUri = (value?: string | null, mimeType = 'image/jpeg') => {
   if (!value) {
@@ -109,6 +134,7 @@ export default function ExpensesScreen() {
   const [editPercentageSplits, setEditPercentageSplits] = useState<Record<string, string>>({});
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
 
   const roundCurrency = (value: number) => {
     return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -278,12 +304,62 @@ const handleDelete = (item: Expense) => {
       return undefined;
     };
 
+    const rawCategoryLabel =
+      raw?.category ??
+      raw?.categoryName ??
+      raw?.category_name ??
+      raw?.categoryLabel ??
+      raw?.category_label ??
+      raw?.type ??
+      null;
+
+    const resolvedCategory = normalizeCategoryType(
+      raw?.categoryType ??
+        raw?.category_type ??
+        rawCategoryLabel ??
+        raw?.categoryEmoji ??
+        raw?.category_emoji ??
+        undefined
+    );
+
+    const categoryEmojiValue =
+      raw?.categoryEmoji ??
+      raw?.category_emoji ??
+      raw?.categoryIcon ??
+      raw?.category_icon ??
+      null;
+
+    const expenseDateField: Expense['originalExpenseDateField'] =
+      raw?.expense_date != null
+        ? 'expense_date'
+        : raw?.expenseDate != null
+        ? 'expenseDate'
+        : raw?.date != null
+        ? 'date'
+        : undefined;
+
+    const expenseDateValue =
+      raw?.expense_date ??
+      raw?.expenseDate ??
+      raw?.date ??
+      null;
+
+    const resolvedDateValue =
+      expenseDateValue ??
+      raw?.createdAt ??
+      raw?.created_at ??
+      new Date().toISOString();
+
     return {
       id: String(raw?.id ?? raw?.expenseId ?? raw?.expense_id ?? ''),
-      category: (raw?.categoryEmoji ?? raw?.category_emoji ?? raw?.category ?? raw?.type ?? 'other') as Expense['category'],
+      category: resolvedCategory,
+      categoryLabel: rawCategoryLabel ?? undefined,
+      categoryEmoji: categoryEmojiValue ?? undefined,
       description: raw?.description ?? raw?.title ?? 'Expense',
       amount: Number(raw?.amount ?? raw?.total ?? raw?.expense_amount ?? 0),
-      date: String(raw?.date ?? raw?.expense_date ?? raw?.createdAt ?? raw?.created_at ?? new Date().toISOString()),
+      date: String(resolvedDateValue),
+      originalExpenseDateField: expenseDateField,
+      originalExpenseDate: expenseDateValue ? String(expenseDateValue) : undefined,
       groupId: String(raw?.groupId ?? raw?.group_id ?? raw?.group?.id ?? ''),
       paidBy: {
         id: paidById,
@@ -441,6 +517,57 @@ const handleDelete = (item: Expense) => {
       loadExpenses();
     }, [loadCurrentUserId, loadExpenses, loadGroups])
   );
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadSettlementsForGroups = async () => {
+      if (!backendGroups.length) {
+        if (isActive) {
+          setSettlements([]);
+        }
+        return;
+      }
+
+      try {
+        const lists = await Promise.all(
+          backendGroups.map(async group => {
+            const groupIdNumber = Number(group?.id);
+            if (!Number.isFinite(groupIdNumber)) {
+              return [];
+            }
+
+            try {
+              const response = await settlementService.getSettlements(groupIdNumber);
+              const payload = extractSettlementsPayload(response);
+              return payload.map(normalizeSettlement);
+            } catch (error) {
+              console.log('Failed to load settlements for group', group?.id, error);
+              return [];
+            }
+          })
+        );
+
+        if (isActive) {
+          const flattened = lists
+            .flat()
+            .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+          setSettlements(flattened);
+        }
+      } catch (error) {
+        if (isActive) {
+          console.log('Failed to load settlements list', error);
+          setSettlements([]);
+        }
+      }
+    };
+
+    loadSettlementsForGroups();
+
+    return () => {
+      isActive = false;
+    };
+  }, [backendGroups]);
 
   const selectedGroupMembers = useMemo<GroupMember[]>(() => {
     if (!selectedExpense) {
@@ -719,12 +846,53 @@ const handleDelete = (item: Expense) => {
 
     setIsSavingEdit(true);
     try {
-      await expensesService.updateExpense(parseInt(selectedExpense.id, 10), {
+      const safePayload: Record<string, any> = {
         description: editDescription.trim(),
         amount: normalizedAmount,
         splitType,
         splits: splitPayload,
-      });
+      };
+
+      const preservedCategory =
+        selectedExpense.categoryLabel ??
+        (typeof selectedExpense.category === 'string'
+          ? selectedExpense.category
+          : undefined);
+
+      if (preservedCategory) {
+        safePayload.category = preservedCategory;
+      }
+
+      if (selectedExpense.categoryEmoji) {
+        safePayload.categoryEmoji = selectedExpense.categoryEmoji;
+      }
+
+      const preservedDate =
+        selectedExpense.originalExpenseDate ??
+        selectedExpense.date ??
+        selectedExpense.createdAt ??
+        selectedExpense.updatedAt ??
+        null;
+
+      if (preservedDate) {
+        const field = selectedExpense.originalExpenseDateField;
+        if (field === 'expense_date') {
+          safePayload.expense_date = preservedDate;
+        } else if (field === 'expenseDate') {
+          safePayload.expenseDate = preservedDate;
+        } else {
+          safePayload.date = preservedDate;
+        }
+
+        if (!safePayload.date) {
+          safePayload.date = preservedDate;
+        }
+        if (!safePayload.expense_date) {
+          safePayload.expense_date = preservedDate;
+        }
+      }
+
+      await expensesService.updateExpense(parseInt(selectedExpense.id, 10), safePayload);
 
       dismissEditModal();
       await loadExpenses();
@@ -775,8 +943,31 @@ const handleDelete = (item: Expense) => {
       }
     });
 
+    settlements.forEach(settlement => {
+      const groupId = String(settlement.groupId || '');
+      if (!groupId) {
+        return;
+      }
+
+      const payerId = String(settlement.payerId || '');
+      const receiverId = String(settlement.receiverId || '');
+
+      if (payerId === me && receiverId) {
+        const key = `${groupId}::${receiverId}`;
+        const next = roundCurrency((netMap.get(key) ?? 0) + settlement.amount);
+        netMap.set(key, next);
+        return;
+      }
+
+      if (receiverId === me && payerId) {
+        const key = `${groupId}::${payerId}`;
+        const next = roundCurrency((netMap.get(key) ?? 0) - settlement.amount);
+        netMap.set(key, next);
+      }
+    });
+
     return netMap;
-  }, [expenses, currentUserId]);
+  }, [expenses, settlements, currentUserId]);
 
   const visibleExpenses = useMemo(() => {
     return expenses.filter(expense => !isSettlementDescription(expense.description));
