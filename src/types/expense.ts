@@ -11,6 +11,8 @@ export type CategoryType = 'food' | 'travel' | 'utilities' | 'shopping' | 'enter
 export interface Expense {
   id: string;
   category: CategoryType;
+  categoryLabel?: string;
+  categoryEmoji?: string;
   description: string;
   amount: number;
   date: string;    
@@ -20,4 +22,6 @@ export interface Expense {
   splitType?: 'equal' | 'exact' | 'percentage';
   createdAt?: string;
   updatedAt?: string;
+  originalExpenseDateField?: 'date' | 'expense_date' | 'expenseDate';
+  originalExpenseDate?: string;
 }
