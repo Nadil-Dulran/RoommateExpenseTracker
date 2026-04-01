@@ -15,9 +15,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
 
 import { RootStackParamList, SettleUpExpenseContext } from '../../types/navigation';
-import { Expense } from '../../types';
+import { Expense, Settlement } from '../../types';
 import { expensesService } from '../../services/expensesService';
 import { groupMembersService } from '../../services/groupMembersService';
+import { settlementService } from '../../services/settlementService';
+import {
+  extractSettlementsPayload,
+  normalizeSettlement,
+} from '../../utils/settlements';
 import { useAppCurrency } from '../../context/CurrencyContext';
 
 type RouteProps = RouteProp<RootStackParamList, 'SettleUp'>;
@@ -136,7 +141,7 @@ const normalizeExpense = (raw: any): Expense => {
 export default function SettleUpScreen() {
   const navigation = useNavigation<NavigationProps>();
   const route = useRoute<RouteProps>();
-  const { formatCurrency } = useAppCurrency();
+  const { formatCurrency, currencyCode } = useAppCurrency();
 
   const mode = route.params.mode;
   const groupIdFromRoute = route.params.groupId;
@@ -149,6 +154,56 @@ export default function SettleUpScreen() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMember, setSelectedMember] = useState<MemberBalance | null>(null);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+
+  const loadSettlementsForGroups = useCallback(
+    async (candidateGroupIds: Array<string | number | undefined>) => {
+      const numericIds = Array.from(
+        new Set(
+          candidateGroupIds
+            .map(value => {
+              if (value == null || value === '') {
+                return null;
+              }
+              const parsed = Number(value);
+              return Number.isFinite(parsed) ? parsed : null;
+            })
+            .filter((value): value is number => value !== null)
+        )
+      );
+
+      if (numericIds.length === 0) {
+        setSettlements([]);
+        return;
+      }
+
+      try {
+        const lists = await Promise.all(
+          numericIds.map(async groupId => {
+            try {
+              const response = await settlementService.getSettlements(groupId);
+              return extractSettlementsPayload(response);
+            } catch (error) {
+              console.log('Failed to fetch settlements for group', groupId, error);
+              return [];
+            }
+          })
+        );
+
+        const normalized = lists
+          .flat()
+          .map(item => normalizeSettlement(item))
+          .filter(item => !!item.id)
+          .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+
+        setSettlements(normalized);
+      } catch (error) {
+        console.log('Failed to load settlements list for Settle Up', error);
+        setSettlements([]);
+      }
+    },
+    []
+  );
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -198,6 +253,18 @@ export default function SettleUpScreen() {
 
       setGroupMembers(loadedMembers);
       setExpenses(normalizedExpenses);
+
+      const uniqueGroupIds = new Set<string>();
+      if (groupIdFromRoute) {
+        uniqueGroupIds.add(String(groupIdFromRoute));
+      }
+      normalizedExpenses.forEach(expense => {
+        if (expense.groupId) {
+          uniqueGroupIds.add(String(expense.groupId));
+        }
+      });
+
+      await loadSettlementsForGroups(Array.from(uniqueGroupIds));
     } catch (error) {
       Alert.alert(
         'Failed to load balances',
@@ -205,10 +272,11 @@ export default function SettleUpScreen() {
       );
       setGroupMembers([]);
       setExpenses([]);
+      setSettlements([]);
     } finally {
       setLoading(false);
     }
-  }, [groupIdFromRoute]);
+  }, [groupIdFromRoute, loadSettlementsForGroups]);
 
   useEffect(() => {
     loadData();
@@ -228,8 +296,20 @@ export default function SettleUpScreen() {
       }
     });
 
+    settlements.forEach(settlement => {
+      const payerId = String(settlement.payerId || '');
+      if (payerId && !map.has(payerId)) {
+        map.set(payerId, settlement.payerName || `Member ${payerId}`);
+      }
+
+      const receiverId = String(settlement.receiverId || '');
+      if (receiverId && !map.has(receiverId)) {
+        map.set(receiverId, settlement.receiverName || `Member ${receiverId}`);
+      }
+    });
+
     return map;
-  }, [groupMembers, expenses]);
+  }, [groupMembers, expenses, settlements]);
 
   const expenseSpecificBalances = useMemo<MemberBalance[] | null>(() => {
     if (!expenseContext || !currentUserId) {
@@ -330,6 +410,36 @@ export default function SettleUpScreen() {
       }
     });
 
+    settlements.forEach(settlement => {
+      const payerId = String(settlement.payerId || '');
+      const receiverId = String(settlement.receiverId || '');
+      const amount = Number(settlement.amount || 0);
+      const groupId = settlement.groupId ? String(settlement.groupId) : undefined;
+
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return;
+      }
+
+      if (payerId === String(currentUserId) && receiverId) {
+        const existing = map.get(receiverId) ?? { net: 0, groupIds: new Set<string>() };
+        existing.net += amount;
+        if (groupId) {
+          existing.groupIds.add(groupId);
+        }
+        map.set(receiverId, existing);
+        return;
+      }
+
+      if (receiverId === String(currentUserId) && payerId) {
+        const existing = map.get(payerId) ?? { net: 0, groupIds: new Set<string>() };
+        existing.net -= amount;
+        if (groupId) {
+          existing.groupIds.add(groupId);
+        }
+        map.set(payerId, existing);
+      }
+    });
+
     return Array.from(map.entries())
       .map(([id, entry]) => {
         const memberGroupId =
@@ -346,8 +456,8 @@ export default function SettleUpScreen() {
           groupId: memberGroupId,
         };
       })
-      .filter(member => member.amount >= 0.01);
-  }, [currentUserId, expenses, groupIdFromRoute, memberNameMap]);
+        .filter(member => member.amount >= 0.01);
+      }, [currentUserId, expenses, groupIdFromRoute, memberNameMap, settlements]);
 
   const memberTotals = useMemo(() => {
     if (expenseSpecificBalances && expenseSpecificBalances.length > 0) {
@@ -517,18 +627,20 @@ export default function SettleUpScreen() {
 
     try {
       const youArePaying = selectedMember.isYouPaying;
-      const paidById = youArePaying ? currentUserId : selectedMember.id;
-      const splitUserId = youArePaying ? selectedMember.id : currentUserId;
+      const payerId = youArePaying ? currentUserId : selectedMember.id;
+      const receiverId = youArePaying ? selectedMember.id : currentUserId;
+      const settlementAmount = roundCurrency(selectedMember.amount);
 
-      await expensesService.createExpense({
-        description: 'Settlement',
-        amount: selectedMember.amount,
-        category: 'other',
+      await settlementService.createSettlement({
         groupId: numericGroupId,
-        paidById,
-        date: new Date().toISOString().split('T')[0],
-        splitType: 'exact',
-        splits: [{ userId: splitUserId, amount: selectedMember.amount }],
+        payerId,
+        receiverId,
+        amount: settlementAmount,
+        currency: currencyCode,
+        method: 'CASH',
+        notes: expenseContext?.description
+          ? `Settlement for ${expenseContext.description}`
+          : null,
       });
 
       setSelectedMember(null);
