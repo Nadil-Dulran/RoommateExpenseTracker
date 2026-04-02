@@ -3,6 +3,7 @@ export type SettlementMethod = 'CASH' | 'BANK' | 'UPI';
 export interface Settlement {
   id: string;
   groupId: string;
+  expenseId?: string;
   payerId: string;
   payerName: string;
   receiverId: string;
