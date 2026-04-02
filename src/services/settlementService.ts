@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import API_URL from './api';
 
-const BASE_URL = 'http://10.0.2.2:5000/api';
-const SETTLEMENTS_API_URL = `${BASE_URL}/settlements`;
+const SETTLEMENTS_API_URL = `${API_URL}/settlements`;
 
 const parseJson = async (response: Response) => {
   return response.json().catch(() => null);
@@ -11,7 +11,9 @@ const parseResponse = async (response: Response) => {
   const body = await parseJson(response);
 
   if (!response.ok) {
-    throw new Error(body?.message || body?.error || 'Settlement request failed');
+    const serverMessage = body?.message || body?.error;
+    const fallback = `Settlement request failed (HTTP ${response.status})`;
+    throw new Error(serverMessage || fallback);
   }
 
   return body;
