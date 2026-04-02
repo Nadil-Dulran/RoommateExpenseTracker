@@ -24,6 +24,7 @@ import { useAppCurrency } from '../../context/CurrencyContext';
 import profileIcon from '../../../assets/ProfileIcon.png';
 import { settlementService } from '../../services/settlementService';
 import {
+  extractSettlementExpenseId,
   extractSettlementsPayload,
   normalizeSettlement,
 } from '../../utils/settlements';
@@ -172,7 +173,7 @@ const handleDelete = (item: Expense) => {
     }
   }, []);
 
-  const normalizeMember = (member: any): GroupMember => {
+  const normalizeMember = useCallback((member: any): GroupMember => {
     const avatarValue =
       member?.avatarBase64 ??
       null;
@@ -190,9 +191,9 @@ const handleDelete = (item: Expense) => {
         'Unknown',
       avatarUri: toImageUri(avatarValue, avatarMimeType),
     };
-  };
+  }, []);
 
-  const normalizeGroupInfo = (group: any) => ({
+  const normalizeGroupInfo = useCallback((group: any) => ({
     id: String(group?.id ?? ''),
     name: group?.name || 'Untitled Group',
     emoji: group?.emoji || '👥',
@@ -201,7 +202,7 @@ const handleDelete = (item: Expense) => {
       : Array.isArray(group?.users)
       ? group.users.map(normalizeMember)
       : [],
-  });
+  }), [normalizeMember]);
 
   const extractMembersPayload = (data: any): any[] => {
     if (Array.isArray(data)) { return data; }
@@ -377,8 +378,10 @@ const handleDelete = (item: Expense) => {
     };
   };
 
-  const getGroupInfo = (groupId: string) =>
-    backendGroups.find(g => String(g.id) === String(groupId));
+  const getGroupInfo = useCallback(
+    (groupId: string) => backendGroups.find(g => String(g.id) === String(groupId)),
+    [backendGroups]
+  );
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -439,7 +442,7 @@ const handleDelete = (item: Expense) => {
       console.log('Failed to load groups for expenses', error);
       setBackendGroups([]);
     }
-  }, []);
+  }, [normalizeGroupInfo, normalizeMember]);
 
   const loadExpenses = useCallback(async () => {
     const loadByGroups = async () => {
@@ -584,7 +587,7 @@ const handleDelete = (item: Expense) => {
       name: member?.name ?? `User ${member?.id ?? ''}`,
       avatarUri: member?.avatarUri ?? null,
     }));
-  }, [selectedExpense, backendGroups]);
+  }, [selectedExpense, getGroupInfo]);
 
   const fallbackParticipants = useMemo<GroupMember[]>(() => {
     if (!selectedExpense) {
@@ -973,6 +976,19 @@ const handleDelete = (item: Expense) => {
     return expenses.filter(expense => !isSettlementDescription(expense.description));
   }, [expenses]);
 
+  const settledExpenseIds = useMemo(() => {
+    const settledIds = new Set<string>();
+
+    settlements.forEach(settlement => {
+      const parsed = extractSettlementExpenseId(settlement);
+      if (parsed) {
+        settledIds.add(parsed);
+      }
+    });
+
+    return settledIds;
+  }, [settlements]);
+
 
   const renderExpense = ({ item }: { item: Expense }) => {
   const splits = Array.isArray(item.splits) ? item.splits : [];
@@ -1001,6 +1017,7 @@ const handleDelete = (item: Expense) => {
 
   const statusAmount = roundCurrency(isMyExpense ? amountYouAreOwed : myShareAmount);
   const isSettlementEntry = isSettlementDescription(item.description);
+  const isExpenseSettled = settledExpenseIds.has(String(item.id));
   const counterpartyId =
     isMyExpense
       ? normalizedSplits.find(split => String(split.userId) !== String(resolvedCurrentUserId))?.userId ?? ''
@@ -1055,7 +1072,7 @@ return (
       {activeMenuId === item.id && (
         <View style={styles.dropdown}>
 
-           {!isSettlementEntry && !isSettledWithCounterparty && !!counterpartyId && statusAmount >= 0.01 ? (
+           {!isSettlementEntry && !isExpenseSettled && !isSettledWithCounterparty && !!counterpartyId && statusAmount >= 0.01 ? (
             <Pressable
               onPress={() => {
                 setActiveMenuId(null);
@@ -1142,7 +1159,7 @@ return (
 
       <Text style={styles.metaLight}>  •  </Text>
 
-      {isSettlementEntry || isSettledWithCounterparty || statusAmount < 0.01 ? (
+      {isSettlementEntry || isExpenseSettled || isSettledWithCounterparty || statusAmount < 0.01 ? (
         <Text style={styles.settledText}>Settled</Text>
       ) : (
         <Text style={isMyExpense ? styles.owedText : styles.oweText}>
