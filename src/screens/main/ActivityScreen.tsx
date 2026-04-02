@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -26,6 +26,7 @@ import {
 import { categories } from '../../data/mockData';
 import { settlementService } from '../../services/settlementService';
 import {
+  extractSettlementExpenseId,
   extractSettlementsPayload,
   normalizeSettlement,
 } from '../../utils/settlements';
@@ -47,6 +48,8 @@ type TimelineEntry = {
   id: string;
   kind: 'expense' | 'settlement' | 'group_created';
   date: string;
+  sortTime: number;
+  orderId: number;
   expense?: Expense;
   group?: BackendGroup;
   settlement?: Settlement;
@@ -67,6 +70,8 @@ const ensureDateValue = (value: any): string | undefined => {
   return new Date(timestamp).toISOString();
 };
 
+const EARLIEST_ISO = new Date(0).toISOString();
+
 const resolveGroupTimestamp = (group: any) => {
   const candidates = [
     group?.createdAt,
@@ -80,8 +85,6 @@ const resolveGroupTimestamp = (group: any) => {
     group?.created_time,
     group?.createdTimestamp,
     group?.created_timestamp,
-    group?.updatedAt,
-    group?.updated_at,
   ];
 
   for (const candidate of candidates) {
@@ -135,16 +138,51 @@ const roundCurrency = (value: number) => {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 };
 
+const safeTimestamp = (value?: string) => {
+  const parsed = Date.parse(String(value ?? ''));
+  return Number.isFinite(parsed) ? parsed : Date.parse(EARLIEST_ISO);
+};
+
+const extractNumericOrderFromId = (value?: string) => {
+  if (!value) {
+    return 0;
+  }
+
+  const matches = String(value).match(/\d+/g);
+  if (!matches || matches.length === 0) {
+    return 0;
+  }
+
+  const parsed = Number(matches[matches.length - 1]);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const compareTimelineEntries = (a: TimelineEntry, b: TimelineEntry) => {
+  const timeDiff = b.sortTime - a.sortTime;
+  if (timeDiff !== 0) {
+    return timeDiff;
+  }
+
+  const idDiff = b.orderId - a.orderId;
+  if (idDiff !== 0) {
+    return idDiff;
+  }
+
+  return b.id.localeCompare(a.id);
+};
+
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProps>();
   const { formatCurrency } = useAppCurrency();
 
   const [filter, setFilter] = useState<FilterOption>('all');
-  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [currentUserId, setCurrentUserId] = useState('');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [backendGroups, setBackendGroups] = useState<BackendGroup[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const latestLoadIdRef = useRef(0);
+  const latestExpenseLoadIdRef = useRef(0);
 
   const loadCurrentUserId = useCallback(async () => {
     try {
@@ -195,6 +233,9 @@ export default function ActivityScreen() {
   }, []);
 
   const loadExpenses = useCallback(async () => {
+    const expenseLoadId = latestExpenseLoadIdRef.current + 1;
+    latestExpenseLoadIdRef.current = expenseLoadId;
+
     const loadByGroups = async () => {
       const groupsResponse = await groupsService.getGroups();
       const groupList: any[] = Array.isArray(groupsResponse)
@@ -231,7 +272,9 @@ export default function ActivityScreen() {
         .map(item => normalizeExpense(item))
         .filter(item => !!item.id);
 
-      setExpenses(normalized);
+      if (latestExpenseLoadIdRef.current === expenseLoadId) {
+        setExpenses(normalized);
+      }
     } catch (error) {
       console.log('Failed to load activity expenses directly', error);
       try {
@@ -239,10 +282,14 @@ export default function ActivityScreen() {
         const normalized = sortRawExpensesByLatest(fallbackList)
           .map(item => normalizeExpense(item))
           .filter(item => !!item.id);
-        setExpenses(normalized);
+        if (latestExpenseLoadIdRef.current === expenseLoadId) {
+          setExpenses(normalized);
+        }
       } catch (fallbackError) {
         console.log('Failed to load activity expenses via group fallback', fallbackError);
-        setExpenses([]);
+        if (latestExpenseLoadIdRef.current === expenseLoadId) {
+          setExpenses([]);
+        }
       }
     }
   }, []);
@@ -291,19 +338,38 @@ export default function ActivityScreen() {
     }
   }, []);
 
-  const loadAllData = useCallback(async () => {
-    setLoading(true);
-    await Promise.all([loadCurrentUserId(), loadGroups(), loadExpenses(), loadSettlements()]);
-    setLoading(false);
-  }, [loadCurrentUserId, loadGroups, loadExpenses, loadSettlements]);
+  const loadAllData = useCallback(
+    async (mode: 'initial' | 'refresh' = 'initial') => {
+      const loadId = latestLoadIdRef.current + 1;
+      latestLoadIdRef.current = loadId;
+
+      if (mode === 'initial') {
+        setRefreshing(false);
+      } else {
+        setRefreshing(true);
+      }
+
+      await Promise.allSettled([
+        loadCurrentUserId(),
+        loadGroups(),
+        loadExpenses(),
+        loadSettlements(),
+      ]);
+
+      if (latestLoadIdRef.current === loadId) {
+        setRefreshing(false);
+      }
+    },
+    [loadCurrentUserId, loadGroups, loadExpenses, loadSettlements]
+  );
 
   useEffect(() => {
-    loadAllData();
+    loadAllData('initial');
   }, [loadAllData]);
 
   useFocusEffect(
     useCallback(() => {
-      loadAllData();
+      loadAllData('refresh');
     }, [loadAllData])
   );
 
@@ -319,68 +385,61 @@ export default function ActivityScreen() {
     const entries: TimelineEntry[] = [];
 
     expenses.forEach(expense => {
-      const normalizedDate = ensureDateValue(expense.date);
-      if (!normalizedDate) {
-        return;
-      }
+      const normalizedDate =
+        ensureDateValue(expense.createdAt) ??
+        ensureDateValue(expense.date) ??
+        EARLIEST_ISO;
       entries.push({
-        id: `expense-${expense.id}`,
+        id: `expense-${expense.id}-${expense.groupId}-${normalizedDate}`,
         kind: 'expense',
         date: normalizedDate,
+        sortTime: safeTimestamp(normalizedDate),
+        orderId: extractNumericOrderFromId(expense.id),
         expense,
       });
     });
 
     settlements.forEach(settlement => {
-      const normalizedDate = ensureDateValue(settlement.createdAt);
-      if (!normalizedDate) {
-        return;
-      }
+      const normalizedDate =
+        ensureDateValue(settlement.createdAt) ??
+        EARLIEST_ISO;
 
       entries.push({
-        id: `settlement-${settlement.id}`,
+        id: `settlement-${settlement.id}-${settlement.groupId}-${normalizedDate}`,
         kind: 'settlement',
         date: normalizedDate,
+        sortTime: safeTimestamp(normalizedDate),
+        orderId: extractNumericOrderFromId(settlement.id),
         settlement,
       });
     });
 
     backendGroups.forEach(group => {
-      const normalizedDate = ensureDateValue(group.createdAt);
-      if (!normalizedDate) {
-        return;
-      }
+      const normalizedDate = ensureDateValue(group.createdAt) ?? EARLIEST_ISO;
 
       entries.push({
-        id: `group-${group.id}`,
+        id: `group-${group.id}-${normalizedDate}`,
         kind: 'group_created',
         date: normalizedDate,
+        sortTime: safeTimestamp(normalizedDate),
+        orderId: extractNumericOrderFromId(group.id),
         group,
       });
     });
 
-    return entries
-      .filter(entry => Number.isFinite(Date.parse(entry.date)))
-      .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+    return entries.sort(compareTimelineEntries);
   }, [expenses, settlements, backendGroups]);
 
     const filteredTimeline = useMemo(() => {
-      const validEntries = timelineEntries.filter(entry =>
-        Number.isFinite(Date.parse(entry.date))
-      );
-
       if (filter === 'all') {
-        return validEntries;
+        return timelineEntries;
       }
 
       const windowDays = filter === 'week' ? 7 : 30;
       const boundary = Date.now() - windowDays * DAY_IN_MS;
 
-      return validEntries.filter(entry => {
-        const timestamp = Date.parse(entry.date);
-        if (!Number.isFinite(timestamp)) {
-          return false;
-        }
+      return timelineEntries.filter(entry => {
+        const timestamp = safeTimestamp(entry.date);
         return timestamp >= boundary;
       });
     }, [timelineEntries, filter]);
@@ -399,8 +458,24 @@ export default function ActivityScreen() {
         }
       });
 
-      return Array.from(map.entries()).map(([date, items]) => ({ date, items }));
+      return Array.from(map.entries()).map(([date, items]) => ({
+        date,
+        items: [...items].sort(compareTimelineEntries),
+      }));
     }, [filteredTimeline]);
+
+  const settledExpenseIds = useMemo(() => {
+    const settledIds = new Set<string>();
+
+    settlements.forEach(settlement => {
+      const parsed = extractSettlementExpenseId(settlement);
+      if (parsed) {
+        settledIds.add(parsed);
+      }
+    });
+
+    return settledIds;
+  }, [settlements]);
 
   const getShareForExpense = useCallback(
     (expense: Expense) => {
@@ -524,9 +599,12 @@ export default function ActivityScreen() {
             `Member ${split.userId}`,
     }));
 
+    const isExpenseSettled = settledExpenseIds.has(String(expense.id));
+
     const canSettle =
       !!share &&
       entry.kind !== 'settlement' &&
+      !isExpenseSettled &&
       share.amount >= 0.01 &&
       !!counterpartyId &&
       !!expense.groupId;
@@ -563,10 +641,12 @@ export default function ActivityScreen() {
             <Text
               style={[
                 styles.shareText,
-                share.type === 'owed' ? { color: '#009966' } : { color: '#ff2056' },
+                share.type === 'owed' ? styles.shareTextOwed : styles.shareTextOwing,
               ]}
             >
-              {share.type === 'owed'
+              {isExpenseSettled
+                ? 'Settled'
+                : share.type === 'owed'
                 ? `You're owed ${formatCurrency(share.amount)}`
                 : `You owe ${formatCurrency(share.amount)}`}
             </Text>
@@ -619,13 +699,43 @@ export default function ActivityScreen() {
         ? 'UPI'
         : 'Cash';
     const notes = settlement.notes?.trim();
+    const notesForDisplay = notes
+      ?.replace(/^\[expense:[^\]]+\]\s*/i, '')
+      .trim();
+
+    const relatedExpenseById = settlement.expenseId
+      ? expenses.find(expense => String(expense.id) === String(settlement.expenseId))
+      : undefined;
+
+    const relatedDescription = notesForDisplay
+      ? notesForDisplay
+          .replace(/^settlement\s+for\s+/i, '')
+          .trim()
+          .toLowerCase()
+      : undefined;
+
+    const relatedExpenseByDescription = relatedDescription
+      ? expenses.find(expense => {
+          if (String(expense.groupId) !== String(settlement.groupId)) {
+            return false;
+          }
+
+          return String(expense.description || '').trim().toLowerCase() === relatedDescription;
+        })
+      : undefined;
+
+    const relatedExpense = relatedExpenseById ?? relatedExpenseByDescription;
+
+    const settlementCategory = relatedExpense
+      ? categories[relatedExpense.category] ?? categories.other
+      : categories.other;
 
     return (
       <View key={entry.id} style={styles.card}>
         <View style={styles.cardTop}>
           <View style={styles.cardLeft}>
             <View style={[styles.iconBox, styles.settlementIconBox]}>
-              <Icon name="repeat" size={18} color="#16a34a" />
+              <Text style={styles.icon}>{settlementCategory.icon}</Text>
             </View>
 
             <View>
@@ -641,7 +751,7 @@ export default function ActivityScreen() {
             </View>
           </View>
 
-          <Text style={[styles.amount, { color: '#16a34a' }]}>
+          <Text style={[styles.amount, styles.settlementAmount]}>
             {formatCurrency(settlement.amount)}
           </Text>
         </View>
@@ -656,7 +766,7 @@ export default function ActivityScreen() {
           <View style={styles.methodPill}>
             <Text style={styles.methodText}>{methodLabel}</Text>
           </View>
-          {notes ? <Text style={styles.notesText}>{notes}</Text> : null}
+          {notesForDisplay ? <Text style={styles.notesText}>{notesForDisplay}</Text> : null}
         </View>
       </View>
     );
@@ -676,7 +786,12 @@ export default function ActivityScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadAllData('refresh')} />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Activity</Text>
 
@@ -700,18 +815,14 @@ export default function ActivityScreen() {
           </View>
         </View>
 
-        <View style={{ padding: 16 }}>
-          {loading ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator color="#009966" size="large" />
-            </View>
-          ) : groupedTimeline.length === 0 ? (
+        <View style={styles.contentWrap}>
+          {groupedTimeline.length === 0 ? (
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyText}>No activity yet. Come back after tracking expenses.</Text>
             </View>
           ) : (
             groupedTimeline.map(({ date, items }) => (
-              <View key={date} style={{ marginBottom: 24 }}>
+              <View key={date} style={styles.daySection}>
                 <Text style={styles.dateHeader}>{date}</Text>
                 {items.map(entry => renderEntry(entry))}
               </View>
@@ -825,6 +936,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  shareTextOwed: {
+    color: '#009966',
+  },
+  shareTextOwing: {
+    color: '#ff2056',
+  },
   settleBtn: {
     backgroundColor: '#009966',
     paddingHorizontal: 14,
@@ -881,9 +998,14 @@ const styles = StyleSheet.create({
     color: '#6a7282',
     flex: 1,
   },
-  loadingWrap: {
-    paddingVertical: 24,
-    alignItems: 'center',
+  settlementAmount: {
+    color: '#16a34a',
+  },
+  contentWrap: {
+    padding: 16,
+  },
+  daySection: {
+    marginBottom: 24,
   },
   emptyWrap: {
     paddingVertical: 32,
