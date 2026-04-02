@@ -122,8 +122,10 @@ export const normalizeExpense = (raw: any, fallbackGroupId?: string | number): E
         raw?.expense_date ??
         raw?.createdAt ??
         raw?.created_at ??
-        new Date().toISOString()
+        new Date(0).toISOString()
     ),
+    createdAt: String(raw?.createdAt ?? raw?.created_at ?? raw?.created ?? ''),
+    updatedAt: String(raw?.updatedAt ?? raw?.updated_at ?? raw?.updated ?? ''),
     groupId: String(raw?.groupId ?? raw?.group_id ?? raw?.group?.id ?? fallbackGroupId ?? ''),
     paidBy: {
       id: paidById,
