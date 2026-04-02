@@ -34,10 +34,16 @@ export default function SignupScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [errors, setErrors] = useState<any>({});
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusType, setStatusType] = useState<'success' | 'error' | ''>('');
 
   const handleChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
     setErrors({ ...errors, [field]: undefined });
+    if (statusMessage) {
+      setStatusMessage('');
+      setStatusType('');
+    }
   };
 
   const handleSignup = async () => {
@@ -67,6 +73,8 @@ export default function SignupScreen() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      setStatusMessage('');
+      setStatusType('');
       return;
     }
 
@@ -81,15 +89,20 @@ export default function SignupScreen() {
     });
 
     if (result.message === 'User created successfully') {
-      Alert.alert('Account created');
-      navigation.navigate('Login');
+      setStatusMessage('Account created successfully. Please sign in.');
+      setStatusType('success');
+      setTimeout(() => {
+        navigation.navigate('Login');
+      }, 1200);
     } else {
-      Alert.alert(result.message);
+      setStatusMessage(result.message || 'Signup failed');
+      setStatusType('error');
     }
 
   } catch (error) {
     console.log(error);
-    Alert.alert('Signup failed');
+    setStatusMessage('Signup failed');
+    setStatusType('error');
   }
   };
 
@@ -238,6 +251,19 @@ export default function SignupScreen() {
             </Text>
           </TouchableOpacity>
 
+          {statusMessage ? (
+            <Text
+              style={[
+                styles.statusMessage,
+                statusType === 'success'
+                  ? styles.statusSuccess
+                  : styles.statusError,
+              ]}
+            >
+              {statusMessage}
+            </Text>
+          ) : null}
+
           {/* Divider */}
           <View style={styles.divider}>
             <View style={styles.line} />
@@ -330,6 +356,14 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   primaryButtonText: { color: '#fff', fontWeight: '600' },
+  statusMessage: {
+    textAlign: 'center',
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  statusSuccess: { color: '#009966' },
+  statusError: { color: '#ff2056' },
 
   divider: {
     flexDirection: 'row',
