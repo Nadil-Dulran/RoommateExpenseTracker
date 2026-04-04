@@ -1,22 +1,65 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
+  ImageSourcePropType,
 } from 'react-native';
-import { CompositeNavigationProp } from '@react-navigation/native';
+import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BottomTabParamList, RootStackParamList } from '../../types/navigation';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
-import { groups, expenses, notifications, categories, currentUser } from '../../data/mockData';
+import { categories, notifications } from '../../data/mockData';
 import { Image } from 'react-native';
 import profileIcon from '../../../assets/ProfileIcon.png';
-import { calculateGroupBalance } from '../../services/financeService';
+import { useAppCurrency } from '../../context/CurrencyContext';
+import { dashboardService } from '../../services/dashboardService';
+
+type DashboardUser = {
+  id: string;
+  name: string;
+  avatarBase64?: string | null;
+  currency?: string;
+};
+
+type DashboardGroup = {
+  id: string;
+  name: string;
+  emoji?: string;
+  balance?: {
+    amount: number;
+    isYouOwing: boolean;
+  };
+};
+
+type DashboardExpense = {
+  id: string;
+  category?: keyof typeof categories;
+  description: string;
+  amount: number;
+  date: string;
+  paidBy: {
+    id: string;
+    name: string;
+  };
+};
+
+type DashboardData = {
+  user: DashboardUser;
+  summary: {
+    totalOwed: number;
+    totalOwing: number;
+    totalBalance: number;
+  };
+  groups: DashboardGroup[];
+  recentExpenses: DashboardExpense[];
+};
 
 type DashboardNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BottomTabParamList, 'Home'>,
@@ -24,54 +67,90 @@ type DashboardNavigationProp = CompositeNavigationProp<
 >;
 
 export default function DashboardScreen() {
+  const navigation = useNavigation<DashboardNavigationProp>();
+  const { formatCurrency } = useAppCurrency();
 
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
-const navigation = useNavigation<DashboardNavigationProp>();
-  
-  const { totalOwed, totalOwing } = useMemo(() => {
-  let owed = 0;   // others owe you
-  let owing = 0;  // you owe others
-
-  expenses.forEach(expense => {
-    const yourSplit = expense.splits.find(
-      split => split.userId === currentUser.id
-    );
-
-    // If YOU paid
-    if (expense.paidBy.id === currentUser.id) {
-      expense.splits.forEach(split => {
-        if (split.userId !== currentUser.id) {
-          owed += split.amount;
-        }
-      });
+  const toImageUri = (value?: string | null) => {
+    if (!value) {
+      return null;
     }
 
-    // If someone else paid and you owe
-    else if (yourSplit) {
-      owing += yourSplit.amount;
-    }
-  });
+    const normalizedValue = String(value).trim();
 
-  return {
-    totalOwed: owed,
-    totalOwing: owing,
+    if (!normalizedValue) {
+      return null;
+    }
+
+    if (normalizedValue.startsWith('http://') || normalizedValue.startsWith('https://')) {
+      return normalizedValue;
+    }
+
+    if (normalizedValue.startsWith('data:image')) {
+      return normalizedValue;
+    }
+
+    return `data:image/jpeg;base64,${normalizedValue.replace(/\s/g, '')}`;
   };
-}, [expenses]);
 
-  const totalBalance = totalOwed - totalOwing;
+  const loadDashboard = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setErrorMessage('');
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-  const recentExpenses = expenses.slice(0, 2);
+      const data = await dashboardService.getDashboard();
+      setDashboard(data as DashboardData);
+    } catch (error) {
+      setDashboard(null);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load dashboard');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadDashboard();
+    }, [loadDashboard])
+  );
+
+  const summary = dashboard?.summary ?? {
+    totalOwed: 0,
+    totalOwing: 0,
+    totalBalance: 0,
+  };
+
+  const recentExpenses = dashboard?.recentExpenses ?? [];
+  const groups = dashboard?.groups ?? [];
+  const currentUser = dashboard?.user;
+  const avatarUri = toImageUri(currentUser?.avatarBase64);
+  const avatarSource: ImageSourcePropType = avatarUri ? { uri: avatarUri } : profileIcon;
+  const unreadCount = notifications.filter(notification => !notification.read).length;
 
   return (
     <View style={styles.container}>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#009966" />
+        </View>
+      ) : null}
+
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Dashboard</Text>
-            <Text style={styles.subtitle}>Welcome back, {currentUser.name}!</Text>
+            <Text style={styles.subtitle}>
+              Welcome back, {currentUser?.name ?? 'there'}!
+            </Text>
           </View>
 
           <View style={styles.headerRight}>
@@ -89,7 +168,7 @@ const navigation = useNavigation<DashboardNavigationProp>();
 
             <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
               <Image
-                source={profileIcon}
+                source={avatarSource}
                 style={styles.avatar}
               />
             </TouchableOpacity>
@@ -107,21 +186,21 @@ const navigation = useNavigation<DashboardNavigationProp>();
           </View>
 
           <Text style={styles.balanceAmount}>
-            {totalBalance >= 0 ? '+' : ''}${totalBalance.toFixed(2)}
+            {formatCurrency(summary.totalBalance, { signed: true })}
           </Text>
 
           <View style={styles.balanceRow}>
             <View style={styles.subCard}>
               <Text style={styles.owedLabel}>You are owed</Text>
               <Text style={styles.owedAmount}>
-                ${totalOwed.toFixed(2)}
+                {formatCurrency(summary.totalOwed)}
               </Text>
             </View>
 
             <View style={styles.subCard}>
               <Text style={styles.oweLabel}>You owe</Text>
               <Text style={styles.oweAmount}>
-                ${totalOwing.toFixed(2)}
+                {formatCurrency(summary.totalOwing)}
               </Text>
             </View>
           </View>
@@ -144,68 +223,56 @@ const navigation = useNavigation<DashboardNavigationProp>();
           </TouchableOpacity>
         </View>
 
-       {groups.map(group => {
-  const groupBalance = calculateGroupBalance(
-    group.id,
-    expenses,
-    currentUser
-  );
+        {groups.map(group => {
+          const balance = group.balance ?? { amount: 0, isYouOwing: false };
 
-  return (
-    <TouchableOpacity
-      key={group.id}
-      style={styles.groupCard}
-      onPress={() =>
-        navigation.navigate('GroupDetails', { id: group.id })
-      }
-    >
-      <View style={styles.groupLeft}>
-        <View style={styles.emojiBox}>
-          <Text style={styles.emoji}>{group.emoji}</Text>
-        </View>
+          return (
+            <TouchableOpacity
+              key={group.id}
+              style={styles.groupCard}
+              onPress={() => navigation.navigate('GroupDetails', { id: group.id })}
+            >
+              <View style={styles.groupLeft}>
+                <View style={styles.emojiBox}>
+                  <Text style={styles.emoji}>{group.emoji ?? '👥'}</Text>
+                </View>
 
-        <Text style={styles.groupName}>{group.name}</Text>
-      </View>
+                <Text style={styles.groupName}>{group.name}</Text>
+              </View>
 
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text
-          style={[
-            styles.balanceType,
-            {
-              color: groupBalance.isYouOwing
-                ? '#ff2056'
-                : '#009966',
-            },
-          ]}
-        >
-          {groupBalance.isYouOwing
-            ? 'you owe'
-            : 'owes you'}
-        </Text>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text
+                  style={[
+                    styles.balanceType,
+                    {
+                      color: balance.isYouOwing ? '#ff2056' : '#009966',
+                    },
+                  ]}
+                >
+                  {balance.isYouOwing ? 'you owe' : 'owes you'}
+                </Text>
 
-        <Text
-          style={[
-            styles.groupAmount,
-            {
-              color: groupBalance.isYouOwing
-                ? '#ff2056'
-                : '#009966',
-            },
-          ]}
-        >
-          ${groupBalance.amount.toFixed(2)}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-})}
+                <Text
+                  style={[
+                    styles.groupAmount,
+                    {
+                      color: balance.isYouOwing ? '#ff2056' : '#009966',
+                    },
+                  ]}
+                >
+                  {formatCurrency(balance.amount)}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
         {/* Recent Activity */}
         <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
           Recent Activity
         </Text>
 
         {recentExpenses.map(expense => {
-          const category = categories[expense.category];
+          const category = categories[expense.category ?? 'other'] ?? categories.other;
 
           return (
             <TouchableOpacity
@@ -215,7 +282,7 @@ const navigation = useNavigation<DashboardNavigationProp>();
             >
               <View style={styles.groupLeft}>
                 <View style={styles.categoryIcon}>
-                  <Text>{category.icon}</Text>
+                  <Text>{category?.icon ?? '📌'}</Text>
                 </View>
 
                 <View>
@@ -230,7 +297,7 @@ const navigation = useNavigation<DashboardNavigationProp>();
 
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={styles.activityAmount}>
-                  ${expense.amount.toFixed(2)}
+                  {formatCurrency(expense.amount)}
                 </Text>
                 <Text style={styles.activitySub}>
                   {new Date(expense.date).toLocaleDateString()}
@@ -239,6 +306,12 @@ const navigation = useNavigation<DashboardNavigationProp>();
             </TouchableOpacity>
           );
         })}
+
+        {!!errorMessage && (
+          <View style={styles.errorCard}>
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
+        )}
 
       </ScrollView>
     </View>
@@ -252,6 +325,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
     paddingHorizontal: 20,
+  },
+
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
   },
 
   header: {
@@ -481,5 +565,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#101828',
+  },
+
+  errorCard: {
+    marginTop: 16,
+    marginBottom: 8,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+
+  errorText: {
+    color: '#B91C1C',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
