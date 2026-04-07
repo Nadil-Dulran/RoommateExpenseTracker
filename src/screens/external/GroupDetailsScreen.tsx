@@ -16,12 +16,14 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
 
 import { RootStackParamList } from '../../types/navigation';
-import { Expense, User } from '../../types';
+import { Expense, User, Settlement } from '../../types';
 import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
 import { expensesService } from '../../services/expensesService';
+import { settlementService } from '../../services/settlementService';
 import { calculateGroupBalance } from '../../utils/balance';
 import { extractExpensesPayload, normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
+import { extractSettlementsPayload, normalizeSettlement } from '../../utils/settlements';
 import { useAppCurrency } from '../../context/CurrencyContext';
 
 type RouteProps = RouteProp<RootStackParamList, 'GroupDetails'>;
@@ -44,6 +46,7 @@ export default function GroupDetailsScreen() {
   const group = groupData;
   const [groupExpenses, setGroupExpenses] = useState<Expense[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
 
   const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -106,7 +109,7 @@ export default function GroupDetailsScreen() {
     return `data:${normalizedMime};base64,${compactBase64}`;
   };
 
-  const normalizeMembers = (membersRaw: any[]) => {
+  const normalizeMembers = useCallback((membersRaw: any[]) => {
     return (membersRaw || []).map((member: any, index: number) => {
       return {
         id: String(
@@ -127,7 +130,7 @@ export default function GroupDetailsScreen() {
         )
       };
     });
-  };
+  }, []);
 
   
 
@@ -201,7 +204,7 @@ export default function GroupDetailsScreen() {
     } catch (error) {
       console.log('Failed to load group members', error);
     }
-  }, [group?.id, id]);
+  }, [group?.id, id, normalizeMembers]);
 
   const loadGroupExpenses = useCallback(async () => {
     const targetGroupId = Number(group?.id ?? id);
@@ -235,19 +238,42 @@ export default function GroupDetailsScreen() {
     }
   }, [group?.id, id]);
 
+  const loadSettlements = useCallback(async () => {
+    const targetGroupId = Number(group?.id ?? id);
+
+    if (!Number.isFinite(targetGroupId)) {
+      setSettlements([]);
+      return;
+    }
+
+    try {
+      const response = await settlementService.getSettlements(targetGroupId);
+      const normalized = extractSettlementsPayload(response)
+        .map(item => normalizeSettlement(item))
+        .filter(item => !!item.id);
+
+      setSettlements(normalized);
+    } catch (error) {
+      console.log('Failed to load group settlements', error);
+      setSettlements([]);
+    }
+  }, [group?.id, id]);
+
   useEffect(() => {
     loadCurrentUserId();
     loadGroupInfo();
     loadGroupMembers();
     loadGroupExpenses();
-  }, [loadCurrentUserId, loadGroupInfo, loadGroupMembers, loadGroupExpenses]);
+    loadSettlements();
+  }, [loadCurrentUserId, loadGroupInfo, loadGroupMembers, loadGroupExpenses, loadSettlements]);
 
   useFocusEffect(
     useCallback(() => {
       loadCurrentUserId();
       loadGroupMembers();
       loadGroupExpenses();
-    }, [loadCurrentUserId, loadGroupMembers, loadGroupExpenses])
+      loadSettlements();
+    }, [loadCurrentUserId, loadGroupMembers, loadGroupExpenses, loadSettlements])
   );
 
   useEffect(() => {
@@ -292,21 +318,37 @@ export default function GroupDetailsScreen() {
     }
   };
 
-  if (!group) {
-    return (
-      <View style={styles.center}>
-        <Text>Group not found</Text>
-      </View>
-    );
-  }
-
   // ---------------------------
-  // BALANCE CALCULATIONS
+  // BALANCE CALCULATIONS (moved before early return to respect React hooks rules)
   // ---------------------------
 
   const groupBalance = useMemo(() => {
-    return calculateGroupBalance(groupExpenses, currentUserId);
-  }, [groupExpenses, currentUserId]);
+    const base = calculateGroupBalance(groupExpenses, currentUserId);
+    const me = String(currentUserId || '');
+
+    if (!me) {
+      return base;
+    }
+
+    let signedBalance = base.isYouOwing ? -Number(base.amount || 0) : Number(base.amount || 0);
+
+    settlements.forEach(settlement => {
+      const payerId = String(settlement.payerId || '');
+      const receiverId = String(settlement.receiverId || '');
+      const amount = Number(settlement.amount || 0);
+
+      if (payerId === me && receiverId) {
+        signedBalance += amount;
+      } else if (receiverId === me && payerId) {
+        signedBalance -= amount;
+      }
+    });
+
+    return {
+      amount: Math.abs(signedBalance),
+      isYouOwing: signedBalance < 0,
+    };
+  }, [groupExpenses, currentUserId, settlements]);
 
   const memberBalances = useMemo(
     () => {
@@ -355,6 +397,30 @@ export default function GroupDetailsScreen() {
         }
       });
 
+      settlements.forEach(settlement => {
+        const payerId = String(settlement.payerId || '');
+        const receiverId = String(settlement.receiverId || '');
+        const amount = Number(settlement.amount || 0);
+
+        if (payerId === me && receiverId) {
+          const existing = memberMap.get(receiverId);
+          memberMap.set(receiverId, {
+            id: receiverId,
+            name: existing?.name ?? `Member ${receiverId}`,
+            avatar: existing?.avatar,
+            amount: (existing?.amount ?? 0) + amount,
+          });
+        } else if (receiverId === me && payerId) {
+          const existing = memberMap.get(payerId);
+          memberMap.set(payerId, {
+            id: payerId,
+            name: existing?.name ?? `Member ${payerId}`,
+            avatar: existing?.avatar,
+            amount: (existing?.amount ?? 0) - amount,
+          });
+        }
+      });
+
       return Array.from(memberMap.values())
         .map(member => {
           const netAmount = roundCurrency(member.amount);
@@ -367,7 +433,7 @@ export default function GroupDetailsScreen() {
         })
         .filter(member => member.amount >= 0.01);
     },
-    [currentUserId, groupExpenses, group?.members]
+    [currentUserId, groupExpenses, group?.members, settlements]
   );
 
   const unsettledMemberIds = useMemo(() => {
@@ -410,6 +476,15 @@ export default function GroupDetailsScreen() {
   // ---------------------------
   // UI
   // ---------------------------
+
+  if (!group) {
+    return (
+      <View style={styles.center}>
+        <Text>Group not found</Text>
+      </View>
+    );
+  }
+
 const renderAvatar = (avatar?: string | any) => {
   if (!avatar) {
     return require('../../../assets/ProfileIcon.png'); // fallback image

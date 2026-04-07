@@ -19,10 +19,13 @@ import { Image } from 'react-native';
 import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
 import { expensesService } from '../../services/expensesService';
+import { settlementService } from '../../services/settlementService';
 import { calculateGroupBalance } from '../../utils/balance';
 import { normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
+import { extractSettlementsPayload, normalizeSettlement } from '../../utils/settlements';
 import profileIcon from '../../../assets/ProfileIcon.png';
 import { useAppCurrency } from '../../context/CurrencyContext';
+import { Settlement } from '../../types';
 
 type GroupsNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BottomTabParamList, 'Groups'>,
@@ -35,13 +38,14 @@ export default function GroupsScreen() {
 
   const [groups, setGroups] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
   const [showCreate, setShowCreate] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🏠');
 
-  const toImageUri = (value?: string | null, mimeType?: string | null) => {
+  const toImageUri = useCallback((value?: string | null, mimeType?: string | null) => {
     if (!value) {
       return null;
     }
@@ -64,7 +68,7 @@ export default function GroupsScreen() {
     const normalizedMime = mimeType?.trim() || 'image/jpeg';
 
     return `data:${normalizedMime};base64,${compactBase64}`;
-  };
+  }, []);
 
   const getAvatarSource = (avatar: any) => {
     if (!avatar) {
@@ -74,10 +78,8 @@ export default function GroupsScreen() {
     return typeof avatar === 'string' ? { uri: avatar } : avatar;
   };
 
-  const normalizeMembers = (membersRaw: any[]) => {
+  const normalizeMembers = useCallback((membersRaw: any[]) => {
     return (membersRaw || []).map((member: any, index: number) => {
-      const source = member?.user ?? member?.profile ?? member?.dataValues ?? member;
-
       return {
         id: String(
           member?.id ??
@@ -92,7 +94,7 @@ export default function GroupsScreen() {
         ),
       };
     });
-  };
+  }, [toImageUri]);
 
   const extractMembersPayload = (data: any) => {
     if (Array.isArray(data)) {
@@ -110,7 +112,7 @@ export default function GroupsScreen() {
     return [];
   };
 
-  const normalizeGroup = (group: any) => {
+  const normalizeGroup = useCallback((group: any) => {
     const membersRaw = Array.isArray(group?.members)
       ? group.members
       : Array.isArray(group?.users)
@@ -129,7 +131,7 @@ export default function GroupsScreen() {
       isYouOwing: group.balance?.isYouOwing ?? false,
       amount: group.balance?.amount ?? 0,
     };
-  };
+  }, [normalizeMembers]);
 
   const loadGroups = useCallback(async () => {
 
@@ -161,7 +163,7 @@ export default function GroupsScreen() {
               ...group,
               members: members.length > 0 ? members : group.members,
             };
-          } catch (error) {
+          } catch {
             return group;
           }
         })
@@ -177,7 +179,7 @@ export default function GroupsScreen() {
 
     }
 
-  }, []);
+  }, [normalizeGroup, normalizeMembers]);
 
   const loadExpenses = useCallback(async () => {
     const loadByGroups = async () => {
@@ -237,12 +239,57 @@ export default function GroupsScreen() {
 
   const loadCurrentUserId = useCallback(async () => {
     try {
-      const storedIdRaw = await AsyncStorage.getItem('userId');
+      const storedIdRaw =
+        (await AsyncStorage.getItem('userId')) ||
+        (await AsyncStorage.getItem('user_id'));
       const normalizedId = storedIdRaw ? storedIdRaw.trim() : '';
       setCurrentUserId(normalizedId);
     } catch (error) {
       console.log('Failed to load current user id', error);
       setCurrentUserId('');
+    }
+  }, []);
+
+  const loadSettlements = useCallback(async () => {
+    const fetchForGroup = async (groupId: number) => {
+      try {
+        const response = await settlementService.getSettlements(groupId);
+        return extractSettlementsPayload(response);
+      } catch {
+        return [];
+      }
+    };
+
+    try {
+      const groupsResponse = await groupsService.getGroups();
+      const groupList: any[] = Array.isArray(groupsResponse)
+        ? groupsResponse
+        : Array.isArray(groupsResponse?.data)
+        ? groupsResponse.data
+        : Array.isArray(groupsResponse?.groups)
+        ? groupsResponse.groups
+        : [];
+
+      const settlementResponses = await Promise.all(
+        groupList.map(async group => {
+          const numericGroupId = Number(group?.id);
+          if (!Number.isFinite(numericGroupId)) {
+            return [];
+          }
+
+          return fetchForGroup(numericGroupId);
+        })
+      );
+
+      const normalized = settlementResponses
+        .flat()
+        .map(item => normalizeSettlement(item))
+        .filter(item => !!item.id);
+
+      setSettlements(normalized);
+    } catch (error) {
+      console.log('Failed to load settlements for groups', error);
+      setSettlements([]);
     }
   }, []);
 
@@ -258,15 +305,22 @@ export default function GroupsScreen() {
     loadCurrentUserId();
   }, [loadCurrentUserId]);
 
+  useEffect(() => {
+    loadSettlements();
+  }, [loadSettlements]);
+
   useFocusEffect(
     useCallback(() => {
       loadGroups();
       loadExpenses();
       loadCurrentUserId();
-    }, [loadGroups, loadExpenses, loadCurrentUserId])
+      loadSettlements();
+    }, [loadGroups, loadExpenses, loadCurrentUserId, loadSettlements])
   );
 
   const groupBalances = useMemo(() => {
+    const me = String(currentUserId || '');
+
     return groups.map(group => {
       const groupId = String(group?.id ?? '');
 
@@ -281,14 +335,38 @@ export default function GroupsScreen() {
         return expenseGroupId === groupId;
       });
 
-      const balance = calculateGroupBalance(groupExpenses, currentUserId);
+      const baseBalance = calculateGroupBalance(groupExpenses, currentUserId);
+      let signedBalance = baseBalance.isYouOwing
+        ? -Number(baseBalance.amount || 0)
+        : Number(baseBalance.amount || 0);
+
+      if (me) {
+        settlements
+          .filter(settlement => String(settlement.groupId || '') === groupId)
+          .forEach(settlement => {
+            const payerId = String(settlement.payerId || '');
+            const receiverId = String(settlement.receiverId || '');
+            const amount = Number(settlement.amount || 0);
+
+            if (payerId === me && receiverId) {
+              signedBalance += amount;
+            } else if (receiverId === me && payerId) {
+              signedBalance -= amount;
+            }
+          });
+      }
+
+      const balance = {
+        amount: Math.abs(signedBalance),
+        isYouOwing: signedBalance < 0,
+      };
 
       return {
         group,
         balance,
       };
     });
-  }, [groups, expenses, currentUserId]);
+  }, [groups, expenses, currentUserId, settlements]);
 
   const handleCreateGroup = async () => {
 
