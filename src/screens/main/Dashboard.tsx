@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,21 @@ import {
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BottomTabParamList, RootStackParamList } from '../../types/navigation';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
-import { categories, notifications } from '../../data/mockData';
+import { notifications } from '../../data/mockData';
 import { Image } from 'react-native';
 import profileIcon from '../../../assets/ProfileIcon.png';
 import { useAppCurrency } from '../../context/CurrencyContext';
 import { dashboardService } from '../../services/dashboardService';
+import { groupsService } from '../../services/groupsService';
+import { settlementService } from '../../services/settlementService';
+import { CATEGORY_EMOJI_BY_TYPE, DashboardCategory } from '../../constants/emojis';
+import { Settlement } from '../../types';
+import { extractSettlementsPayload, normalizeSettlement } from '../../utils/settlements';
 
 type DashboardUser = {
   id: string;
@@ -40,10 +46,10 @@ type DashboardGroup = {
 
 type DashboardExpense = {
   id: string;
-  category?: keyof typeof categories;
   description: string;
   amount: number;
   date: string;
+  emoji: string;
   paidBy: {
     id: string;
     name: string;
@@ -61,6 +67,107 @@ type DashboardData = {
   recentExpenses: DashboardExpense[];
 };
 
+const toSafeNumber = (value: any) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const toSafeString = (value: any, fallback = '') => {
+  if (value == null) {
+    return fallback;
+  }
+
+  const parsed = String(value).trim();
+  return parsed || fallback;
+};
+
+const getExpenseEmoji = (expense: any) => {
+  const directEmojiCandidates = [
+    expense?.emoji,
+    expense?.categoryEmoji,
+    expense?.category_emoji,
+    expense?.categoryIcon,
+    expense?.category_icon,
+    expense?.icon,
+    expense?.category?.emoji,
+    expense?.category?.icon,
+  ];
+
+  const directEmoji = directEmojiCandidates
+    .map(value => toSafeString(value))
+    .find(value => !!value);
+
+  if (directEmoji) {
+    return directEmoji;
+  }
+
+  const categoryKey = toSafeString(
+    expense?.category ?? expense?.type ?? expense?.categoryType ?? expense?.category_type,
+    'other'
+  ).toLowerCase() as DashboardCategory;
+
+  return CATEGORY_EMOJI_BY_TYPE[categoryKey] ?? CATEGORY_EMOJI_BY_TYPE.other;
+};
+
+const normalizeRecentExpense = (expense: any): DashboardExpense => ({
+  id: toSafeString(expense?.id ?? expense?.expenseId ?? expense?.expense_id),
+  description: toSafeString(expense?.description ?? expense?.title, 'Expense'),
+  amount: toSafeNumber(expense?.amount ?? expense?.total ?? expense?.expense_amount),
+  date: toSafeString(
+    expense?.date ?? expense?.expense_date ?? expense?.createdAt ?? expense?.created_at,
+    new Date(0).toISOString()
+  ),
+  emoji: getExpenseEmoji(expense),
+  paidBy: {
+    id: toSafeString(
+      expense?.paidBy?.id ?? expense?.paid_by_id ?? expense?.paidById ?? expense?.userId
+    ),
+    name: toSafeString(
+      expense?.paidBy?.name ??
+        expense?.paid_by_name ??
+        expense?.paidByName ??
+        expense?.user?.name,
+      'Unknown'
+    ),
+  },
+});
+
+const normalizeDashboardData = (raw: any): DashboardData => {
+  const source = raw?.data ?? raw ?? {};
+  const user = source?.user ?? {};
+  const summary = source?.summary ?? {};
+  const groups = Array.isArray(source?.groups) ? source.groups : [];
+  const recentExpenses = Array.isArray(source?.recentExpenses)
+    ? source.recentExpenses
+    : Array.isArray(source?.recent_expenses)
+    ? source.recent_expenses
+    : [];
+
+  return {
+    user: {
+      id: toSafeString(user?.id),
+      name: toSafeString(user?.name, 'User'),
+      avatarBase64: user?.avatarBase64 ?? user?.avatar_base64 ?? user?.avatar ?? null,
+      currency: toSafeString(user?.currency),
+    },
+    summary: {
+      totalOwed: toSafeNumber(summary?.totalOwed ?? summary?.total_owed),
+      totalOwing: toSafeNumber(summary?.totalOwing ?? summary?.total_owing),
+      totalBalance: toSafeNumber(summary?.totalBalance ?? summary?.total_balance),
+    },
+    groups: groups.map((group: any) => ({
+      id: toSafeString(group?.id),
+      name: toSafeString(group?.name, 'Untitled Group'),
+      emoji: toSafeString(group?.emoji, '👥'),
+      balance: {
+        amount: toSafeNumber(group?.balance?.amount),
+        isYouOwing: Boolean(group?.balance?.isYouOwing),
+      },
+    })),
+    recentExpenses: recentExpenses.map(normalizeRecentExpense),
+  };
+};
+
 type DashboardNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BottomTabParamList, 'Home'>,
   NativeStackNavigationProp<RootStackParamList>
@@ -73,6 +180,8 @@ export default function DashboardScreen() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
   const toImageUri = (value?: string | null) => {
     if (!value) {
@@ -96,13 +205,70 @@ export default function DashboardScreen() {
     return `data:image/jpeg;base64,${normalizedValue.replace(/\s/g, '')}`;
   };
 
+  const loadCurrentUserId = useCallback(async () => {
+    try {
+      const storedUserId =
+        (await AsyncStorage.getItem('userId')) ||
+        (await AsyncStorage.getItem('user_id'));
+
+      if (storedUserId) {
+        setCurrentUserId(String(storedUserId));
+      }
+    } catch (error) {
+      console.log('Failed to load current user id for dashboard', error);
+    }
+  }, []);
+
+  const loadSettlements = useCallback(async () => {
+    const fetchForGroup = async (groupId: number) => {
+      try {
+        const response = await settlementService.getSettlements(groupId);
+        return extractSettlementsPayload(response);
+      } catch {
+        return [];
+      }
+    };
+
+    try {
+      const groupsResponse = await groupsService.getGroups();
+      const groupList: any[] = Array.isArray(groupsResponse)
+        ? groupsResponse
+        : Array.isArray(groupsResponse?.data)
+        ? groupsResponse.data
+        : Array.isArray(groupsResponse?.groups)
+        ? groupsResponse.groups
+        : [];
+
+      const settlementResponses = await Promise.all(
+        groupList.map(async group => {
+          const groupId = Number(group?.id);
+          if (!Number.isFinite(groupId)) {
+            return [];
+          }
+
+          return fetchForGroup(groupId);
+        })
+      );
+
+      const normalized = settlementResponses
+        .flat()
+        .map(item => normalizeSettlement(item))
+        .filter(item => !!item.id);
+
+      setSettlements(normalized);
+    } catch (error) {
+      console.log('Failed to load settlements for dashboard', error);
+      setSettlements([]);
+    }
+  }, []);
+
   const loadDashboard = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrorMessage('');
 
       const data = await dashboardService.getDashboard();
-      setDashboard(data as DashboardData);
+      setDashboard(normalizeDashboardData(data));
     } catch (error) {
       setDashboard(null);
       setErrorMessage(error instanceof Error ? error.message : 'Failed to load dashboard');
@@ -111,24 +277,113 @@ export default function DashboardScreen() {
     }
   }, []);
 
+  const loadAllDashboardData = useCallback(async () => {
+    await Promise.allSettled([
+      loadCurrentUserId(),
+      loadDashboard(),
+      loadSettlements(),
+    ]);
+  }, [loadCurrentUserId, loadDashboard, loadSettlements]);
+
   useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
+    void loadAllDashboardData();
+  }, [loadAllDashboardData]);
 
   useFocusEffect(
     useCallback(() => {
-      void loadDashboard();
-    }, [loadDashboard])
+      void loadAllDashboardData();
+    }, [loadAllDashboardData])
   );
 
-  const summary = dashboard?.summary ?? {
-    totalOwed: 0,
-    totalOwing: 0,
-    totalBalance: 0,
-  };
+  const baseSummary = useMemo(() => {
+    return (
+      dashboard?.summary ?? {
+        totalOwed: 0,
+        totalOwing: 0,
+        totalBalance: 0,
+      }
+    );
+  }, [dashboard?.summary]);
+
+  const adjustedSummary = useMemo(() => {
+    let adjustedBalance = baseSummary.totalBalance;
+    let adjustedOwed = baseSummary.totalOwed;
+    let adjustedOwing = baseSummary.totalOwing;
+
+    const me = String(currentUserId || '');
+    if (!me) {
+      return { totalOwed: adjustedOwed, totalOwing: adjustedOwing, totalBalance: adjustedBalance };
+    }
+
+    settlements.forEach(settlement => {
+      const payerId = String(settlement.payerId || '');
+      const receiverId = String(settlement.receiverId || '');
+      const amount = Number(settlement.amount || 0);
+
+      if (payerId === me && receiverId) {
+        adjustedBalance += amount;
+        adjustedOwing -= amount;
+      } else if (receiverId === me && payerId) {
+        adjustedBalance -= amount;
+        adjustedOwed -= amount;
+      }
+    });
+
+    return {
+      totalOwed: Math.max(0, adjustedOwed),
+      totalOwing: Math.max(0, adjustedOwing),
+      totalBalance: adjustedBalance,
+    };
+  }, [baseSummary, settlements, currentUserId]);
+
+  const summary = adjustedSummary;
 
   const recentExpenses = dashboard?.recentExpenses ?? [];
-  const groups = dashboard?.groups ?? [];
+  const baseGroups = useMemo(() => {
+    return dashboard?.groups ?? [];
+  }, [dashboard?.groups]);
+
+  const groups = useMemo(() => {
+    const me = String(currentUserId || '');
+    if (!me) {
+      return baseGroups;
+    }
+
+    return baseGroups.map(group => {
+      const groupId = String(group.id || '');
+      const groupSettlements = settlements.filter(
+        s => String(s.groupId || '') === groupId
+      );
+
+      if (groupSettlements.length === 0) {
+        return group;
+      }
+
+      let adjustedAmount = group.balance?.amount ?? 0;
+      const isYouOwing = group.balance?.isYouOwing ?? false;
+
+      groupSettlements.forEach(settlement => {
+        const payerId = String(settlement.payerId || '');
+        const receiverId = String(settlement.receiverId || '');
+        const amount = Number(settlement.amount || 0);
+
+        if (isYouOwing && payerId === me && receiverId) {
+          adjustedAmount -= amount;
+        } else if (!isYouOwing && receiverId === me && payerId) {
+          adjustedAmount -= amount;
+        }
+      });
+
+      return {
+        ...group,
+        balance: {
+          amount: Math.max(0, adjustedAmount),
+          isYouOwing: group.balance?.isYouOwing ?? false,
+        },
+      };
+    });
+  }, [baseGroups, settlements, currentUserId]);
+
   const currentUser = dashboard?.user;
   const avatarUri = toImageUri(currentUser?.avatarBase64);
   const avatarSource: ImageSourcePropType = avatarUri ? { uri: avatarUri } : profileIcon;
@@ -272,8 +527,6 @@ export default function DashboardScreen() {
         </Text>
 
         {recentExpenses.map(expense => {
-          const category = categories[expense.category ?? 'other'] ?? categories.other;
-
           return (
             <TouchableOpacity
               key={expense.id}
@@ -281,8 +534,8 @@ export default function DashboardScreen() {
               onPress={() => navigation.navigate('Activity')}
             >
               <View style={styles.groupLeft}>
-                <View style={styles.categoryIcon}>
-                  <Text>{category?.icon ?? '📌'}</Text>
+                <View style={styles.iconBox}>
+                  <Text style={styles.icon}>{expense.emoji}</Text>
                 </View>
 
                 <View>
@@ -547,13 +800,17 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  categoryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f9fafb',
+  iconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  icon: {
+    fontSize: 20,
   },
 
   activitySub: {
