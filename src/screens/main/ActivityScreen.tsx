@@ -23,7 +23,7 @@ import {
   normalizeExpense,
   sortRawExpensesByLatest,
 } from '../../utils/expenses';
-import { categories } from '../../data/mockData';
+import { CATEGORY_EMOJI_BY_TYPE, DashboardCategory } from '../../constants/emojis';
 import { settlementService } from '../../services/settlementService';
 import {
   extractSettlementExpenseId,
@@ -155,6 +155,11 @@ const extractNumericOrderFromId = (value?: string) => {
 
   const parsed = Number(matches[matches.length - 1]);
   return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getCategoryEmoji = (categoryValue?: string) => {
+  const normalized = String(categoryValue ?? 'other').toLowerCase() as DashboardCategory;
+  return CATEGORY_EMOJI_BY_TYPE[normalized] ?? CATEGORY_EMOJI_BY_TYPE.other;
 };
 
 const compareTimelineEntries = (a: TimelineEntry, b: TimelineEntry) => {
@@ -561,7 +566,7 @@ export default function ActivityScreen() {
 
     const expense = entry.expense;
     const group = groupMap.get(String(expense.groupId));
-    const category = categories[expense.category] ?? categories.other;
+    const categoryEmoji = getCategoryEmoji(expense.category);
     const share = getShareForExpense(expense);
 
     const splits = Array.isArray(expense.splits) ? expense.splits : [];
@@ -614,7 +619,7 @@ export default function ActivityScreen() {
         <View style={styles.cardTop}>
           <View style={styles.cardLeft}>
             <View style={styles.iconBox}>
-              <Text style={styles.icon}>{category.icon}</Text>
+              <Text style={styles.icon}>{categoryEmoji}</Text>
             </View>
 
             <View>
@@ -726,16 +731,14 @@ export default function ActivityScreen() {
 
     const relatedExpense = relatedExpenseById ?? relatedExpenseByDescription;
 
-    const settlementCategory = relatedExpense
-      ? categories[relatedExpense.category] ?? categories.other
-      : categories.other;
+    const settlementEmoji = getCategoryEmoji(relatedExpense?.category);
 
     return (
       <View key={entry.id} style={styles.card}>
         <View style={styles.cardTop}>
           <View style={styles.cardLeft}>
             <View style={[styles.iconBox, styles.settlementIconBox]}>
-              <Text style={styles.icon}>{settlementCategory.icon}</Text>
+              <Text style={styles.icon}>{settlementEmoji}</Text>
             </View>
 
             <View>
