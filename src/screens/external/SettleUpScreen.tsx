@@ -17,8 +17,10 @@ import Icon from 'react-native-vector-icons/Feather';
 import { RootStackParamList, SettleUpExpenseContext } from '../../types/navigation';
 import { Expense, Settlement } from '../../types';
 import { expensesService } from '../../services/expensesService';
+import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
 import { settlementService } from '../../services/settlementService';
+import { dashboardService } from '../../services/dashboardService';
 import {
   extractSettlementsPayload,
   normalizeSettlement,
@@ -61,20 +63,46 @@ const extractMembersPayload = (data: any): any[] => {
   return [];
 };
 
+const extractGroupsPayload = (data: any): any[] => {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (Array.isArray(data?.data)) {
+    return data.data;
+  }
+
+  if (Array.isArray(data?.groups)) {
+    return data.groups;
+  }
+
+  return [];
+};
+
 const normalizeMember = (member: any): GroupMember => ({
   id: String(
-    member.id ??
+    member?.id ??
+      member?.user_id ??
+      member?.userId ??
+      member?.user?.id ??
       ''
   ),
   name:
-    member.name ??
+    member?.name ??
+    member?.user_name ??
+    member?.username ??
+    member?.user?.name ??
     'Member',
 });
 
 const normalizeExpense = (raw: any): Expense => {
   const getSplitUserId = (split: any) => {
     return String(
+        split.userId ??
         split.user_id ??
+        split.memberId ??
+        split.member_id ??
+        split.user?.id ??
         ''
     );
   };
@@ -82,6 +110,9 @@ const normalizeExpense = (raw: any): Expense => {
   const getSplitAmount = (split: any) => {
     return Number(
       split.share_amount ??
+        split.amount ??
+        split.shareAmount ??
+        split.share ??
         0
     );
   };
@@ -99,7 +130,13 @@ const normalizeExpense = (raw: any): Expense => {
     : [];
 
   const paidById = String(
+      raw.paidByUser?.id ??
+      raw.paid_by_user?.id ??
+      raw.paidBy?.id ??
+      raw.paidById ??
       raw.paid_by ??
+      raw.paid_by_id ??
+      raw.userId ??
       ''
   );
 
@@ -124,6 +161,7 @@ const normalizeExpense = (raw: any): Expense => {
         raw?.paidBy?.name ??
         raw?.paid_by_name ??
         raw?.paidByName ??
+        raw?.user?.name ??
         'Unknown',
     },
     splits: splitsRaw
@@ -133,7 +171,7 @@ const normalizeExpense = (raw: any): Expense => {
       }))
       .filter(
         (split: { userId: string; amount: number }) =>
-          !!split.userId && split.amount > 0
+          !!split.userId && Number.isFinite(split.amount) && split.amount > 0
       ),
   };
 };
@@ -155,6 +193,31 @@ export default function SettleUpScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedMember, setSelectedMember] = useState<MemberBalance | null>(null);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
+
+  const resolveCurrentUserId = useCallback(async () => {
+    const fromStorage =
+      (await AsyncStorage.getItem('userId')) ??
+      (await AsyncStorage.getItem('user_id'));
+
+    if (fromStorage && String(fromStorage).trim() && String(fromStorage) !== 'undefined') {
+      return String(fromStorage);
+    }
+
+    try {
+      const dashboard = await dashboardService.getDashboard();
+      const dashboardUserId =
+        dashboard?.user?.id ??
+        dashboard?.data?.user?.id;
+
+      if (dashboardUserId != null && String(dashboardUserId).trim()) {
+        return String(dashboardUserId);
+      }
+    } catch {
+      // Ignore dashboard fallback errors and surface the original issue below.
+    }
+
+    return '';
+  }, []);
 
   const loadSettlementsForGroups = useCallback(
     async (candidateGroupIds: Array<string | number | undefined>) => {
@@ -209,8 +272,7 @@ export default function SettleUpScreen() {
     setLoading(true);
 
     try {
-      const storedUserId =
-        (await AsyncStorage.getItem('userId'));
+      const storedUserId = await resolveCurrentUserId();
 
       if (!storedUserId) {
         throw new Error('Current user is not available. Please log in again.');
@@ -229,6 +291,42 @@ export default function SettleUpScreen() {
         } catch {
           loadedMembers = [];
         }
+      } else {
+        try {
+          const groupsResponse = await groupsService.getGroups();
+          const groups = extractGroupsPayload(groupsResponse);
+          const groupIds = Array.from(
+            new Set(
+              groups
+                .map((group: any) => String(group?.id ?? '').trim())
+                .filter((id: string) => !!id)
+            )
+          );
+
+          const membersByGroup = await Promise.all(
+            groupIds.map(async id => {
+              try {
+                const response = await groupMembersService.getMembers(id);
+                return extractMembersPayload(response)
+                  .map(normalizeMember)
+                  .filter((member: GroupMember) => !!member.id);
+              } catch {
+                return [];
+              }
+            })
+          );
+
+          const uniqueMembers = new Map<string, GroupMember>();
+          membersByGroup.flat().forEach(member => {
+            if (!uniqueMembers.has(member.id)) {
+              uniqueMembers.set(member.id, member);
+            }
+          });
+
+          loadedMembers = Array.from(uniqueMembers.values());
+        } catch {
+          loadedMembers = [];
+        }
       }
 
       let rawExpenses: any[] = [];
@@ -244,7 +342,36 @@ export default function SettleUpScreen() {
           });
         }
       } else {
-        rawExpenses = await expensesService.getExpenses();
+        try {
+          rawExpenses = await expensesService.getExpenses();
+        } catch {
+          const dashboard = await dashboardService.getDashboard();
+          const dashboardGroups = Array.isArray(dashboard?.groups)
+            ? dashboard.groups
+            : Array.isArray(dashboard?.data?.groups)
+            ? dashboard.data.groups
+            : [];
+
+          const groupIds: number[] = Array.from(
+            new Set(
+              dashboardGroups
+                .map((group: any) => Number(group?.id))
+                .filter((id: number) => Number.isFinite(id))
+            )
+          );
+
+          const grouped = await Promise.all(
+            groupIds.map(async (groupId: number) => {
+              try {
+                return await expensesService.getExpenses(groupId);
+              } catch {
+                return [];
+              }
+            })
+          );
+
+          rawExpenses = grouped.flat();
+        }
       }
 
       const normalizedExpenses = rawExpenses
@@ -276,7 +403,7 @@ export default function SettleUpScreen() {
     } finally {
       setLoading(false);
     }
-  }, [groupIdFromRoute, loadSettlementsForGroups]);
+  }, [groupIdFromRoute, loadSettlementsForGroups, resolveCurrentUserId]);
 
   useEffect(() => {
     loadData();
@@ -604,6 +731,14 @@ export default function SettleUpScreen() {
 
   const handleConfirmSettle = async () => {
     if (!selectedMember) {
+      return;
+    }
+
+    if (!selectedMember.isYouPaying) {
+      Alert.alert(
+        'Waiting for other member',
+        'Only balances you owe can be marked as settled here. Ask the other member to record the payment from their device.'
+      );
       return;
     }
 
