@@ -1,16 +1,16 @@
 export type DashboardCategory =
   | 'food'
-  | 'travel'
+  | 'transport'
   | 'shopping'
-  | 'utilities'
+  | 'bills'
   | 'entertainment'
   | 'other';
 
 export const CATEGORY_EMOJI_BY_TYPE: Record<DashboardCategory, string> = {
   food: '🍔',
-  travel: '🚗',
+  transport: '🚗',
   shopping: '🛍️',
-  utilities: '🧾',
+  bills: '🧾',
   entertainment: '🎬',
   other: '📌',
 };
