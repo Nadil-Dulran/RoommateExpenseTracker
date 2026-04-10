@@ -39,8 +39,8 @@ interface GroupMember {
 
 const CATEGORY_KEYS: Expense['category'][] = [
   'food',
-  'travel',
-  'utilities',
+  'transport',
+  'bills',
   'shopping',
   'entertainment',
   'other',
@@ -513,63 +513,55 @@ const handleDelete = (item: Expense) => {
     loadExpenses();
   }, [loadCurrentUserId, loadExpenses, loadGroups]);
 
+  const loadSettlementsForCurrentGroups = useCallback(async () => {
+    if (!backendGroups.length) {
+      setSettlements([]);
+      return;
+    }
+
+    try {
+      const lists = await Promise.all(
+        backendGroups.map(async group => {
+          const groupIdNumber = Number(group?.id);
+          if (!Number.isFinite(groupIdNumber)) {
+            return [];
+          }
+
+          try {
+            const response = await settlementService.getSettlements(groupIdNumber);
+            const payload = extractSettlementsPayload(response);
+            return payload.map(normalizeSettlement);
+          } catch (error) {
+            console.log('Failed to load settlements for group', group?.id, error);
+            return [];
+          }
+        })
+      );
+
+      const flattened = lists
+        .flat()
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      setSettlements(flattened);
+    } catch (error) {
+      console.log('Failed to load settlements list', error);
+      setSettlements([]);
+    }
+  }, [backendGroups]);
+
+  const reloadAllData = useCallback(() => {
+    loadGroups();
+    loadExpenses();
+  }, [loadGroups, loadExpenses]);
+
   useFocusEffect(
     useCallback(() => {
       loadCurrentUserId();
-      loadGroups();
-      loadExpenses();
-    }, [loadCurrentUserId, loadExpenses, loadGroups])
+      reloadAllData();
+    }, [loadCurrentUserId, reloadAllData])
   );
 
   useEffect(() => {
-    let isActive = true;
-
-    const loadSettlementsForGroups = async () => {
-      if (!backendGroups.length) {
-        if (isActive) {
-          setSettlements([]);
-        }
-        return;
-      }
-
-      try {
-        const lists = await Promise.all(
-          backendGroups.map(async group => {
-            const groupIdNumber = Number(group?.id);
-            if (!Number.isFinite(groupIdNumber)) {
-              return [];
-            }
-
-            try {
-              const response = await settlementService.getSettlements(groupIdNumber);
-              const payload = extractSettlementsPayload(response);
-              return payload.map(normalizeSettlement);
-            } catch (error) {
-              console.log('Failed to load settlements for group', group?.id, error);
-              return [];
-            }
-          })
-        );
-
-        if (isActive) {
-          const flattened = lists
-            .flat()
-            .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-          setSettlements(flattened);
-        }
-      } catch (error) {
-        if (isActive) {
-          console.log('Failed to load settlements list', error);
-          setSettlements([]);
-        }
-      }
-    };
-
-    loadSettlementsForGroups();
-
-    return () => {
-      isActive = false;
-    };
+    loadSettlementsForCurrentGroups();
   }, [backendGroups]);
 
   const selectedGroupMembers = useMemo<GroupMember[]>(() => {
@@ -906,88 +898,26 @@ const handleDelete = (item: Expense) => {
     }
   };
 
-  const memberNetByGroup = useMemo(() => {
-    const me = String(currentUserId || '');
-    const netMap = new Map<string, number>();
-
-    if (!me) {
-      return netMap;
-    }
-
-    expenses.forEach(expense => {
-      const paidById = String(expense?.paidBy?.id ?? '');
-      const groupId = String(expense?.groupId ?? '');
-      const normalizedSplits = Array.isArray(expense.splits)
-        ? expense.splits.map(split => ({
-            userId: String(split.userId ?? ''),
-            amount: Number(split.amount ?? 0),
-          }))
-        : [];
-
-      const mySplit = normalizedSplits.find(split => split.userId === me);
-
-      if (paidById === me) {
-        normalizedSplits.forEach(split => {
-          if (!split.userId || split.userId === me || split.amount <= 0) {
-            return;
-          }
-
-          const key = `${groupId}::${split.userId}`;
-          const next = roundCurrency((netMap.get(key) ?? 0) + split.amount);
-          netMap.set(key, next);
-        });
-        return;
-      }
-
-      if (mySplit && paidById) {
-        const key = `${groupId}::${paidById}`;
-        const next = roundCurrency((netMap.get(key) ?? 0) - mySplit.amount);
-        netMap.set(key, next);
-      }
-    });
+  const settlementsByExpenseId = useMemo(() => {
+    const map = new Map<string, Settlement[]>();
 
     settlements.forEach(settlement => {
-      const groupId = String(settlement.groupId || '');
-      if (!groupId) {
+      const expenseId = extractSettlementExpenseId(settlement);
+      if (!expenseId) {
         return;
       }
 
-      const payerId = String(settlement.payerId || '');
-      const receiverId = String(settlement.receiverId || '');
-
-      if (payerId === me && receiverId) {
-        const key = `${groupId}::${receiverId}`;
-        const next = roundCurrency((netMap.get(key) ?? 0) + settlement.amount);
-        netMap.set(key, next);
-        return;
-      }
-
-      if (receiverId === me && payerId) {
-        const key = `${groupId}::${payerId}`;
-        const next = roundCurrency((netMap.get(key) ?? 0) - settlement.amount);
-        netMap.set(key, next);
-      }
+      const list = map.get(expenseId) ?? [];
+      list.push(settlement);
+      map.set(expenseId, list);
     });
 
-    return netMap;
-  }, [expenses, settlements, currentUserId]);
+    return map;
+  }, [settlements]);
 
   const visibleExpenses = useMemo(() => {
     return expenses.filter(expense => !isSettlementDescription(expense.description));
   }, [expenses]);
-
-  const settledExpenseIds = useMemo(() => {
-    const settledIds = new Set<string>();
-
-    settlements.forEach(settlement => {
-      const parsed = extractSettlementExpenseId(settlement);
-      if (parsed) {
-        settledIds.add(parsed);
-      }
-    });
-
-    return settledIds;
-  }, [settlements]);
 
 
   const renderExpense = ({ item }: { item: Expense }) => {
@@ -1011,25 +941,61 @@ const handleDelete = (item: Expense) => {
     normalizedSplits.find(split => String(split.userId) === String(resolvedCurrentUserId))?.amount ?? 0;
   const isMyExpense = String(paidBy.id) === String(resolvedCurrentUserId);
 
-  const amountYouAreOwed = normalizedSplits
-    .filter(split => String(split.userId) !== String(resolvedCurrentUserId))
-    .reduce((sum, split) => sum + split.amount, 0);
-
-  const statusAmount = roundCurrency(isMyExpense ? amountYouAreOwed : myShareAmount);
   const isSettlementEntry = isSettlementDescription(item.description);
-  const isExpenseSettled = settledExpenseIds.has(String(item.id));
-  const counterpartyId =
-    isMyExpense
-      ? normalizedSplits.find(split => String(split.userId) !== String(resolvedCurrentUserId))?.userId ?? ''
-      : String(paidBy.id ?? '');
+  const expenseSettlements = settlementsByExpenseId.get(String(item.id)) ?? [];
+
+  const settledAmountForPair = (payerId: string, receiverId: string) => {
+    return roundCurrency(
+      expenseSettlements
+        .filter(settlement => String(settlement.payerId) === payerId && String(settlement.receiverId) === receiverId)
+        .reduce((sum, settlement) => sum + Number(settlement.amount ?? 0), 0)
+    );
+  };
+
+  const resolvedPayerId = String(paidBy.id ?? '');
+  const unsettledCounterparties = isMyExpense
+    ? normalizedSplits
+        .filter(split => String(split.userId) !== String(resolvedCurrentUserId))
+        .map(split => {
+          const settledAmount = settledAmountForPair(String(split.userId), resolvedCurrentUserId);
+          return {
+            userId: String(split.userId),
+            amount: roundCurrency(split.amount),
+            outstanding: roundCurrency(split.amount - settledAmount),
+          };
+        })
+        .filter(split => split.outstanding >= 0.01)
+    : null;
+
+  const unsettledCounterparty = isMyExpense
+    ? unsettledCounterparties?.[0] ?? null
+    : null;
+
+  const counterpartyId = isMyExpense
+    ? unsettledCounterparty?.userId ?? ''
+    : resolvedPayerId;
 
   const counterpartyName =
     group?.members?.find((member: any) => String(member.id) === String(counterpartyId))?.name ??
     (isMyExpense ? `User ${counterpartyId}` : paidByName);
 
-  const netWithCounterparty = memberNetByGroup.get(`${String(item.groupId)}::${String(counterpartyId)}`) ?? 0;
-  const isSettledWithCounterparty =
-    !!counterpartyId && Math.abs(roundCurrency(netWithCounterparty)) < 0.01;
+  const settledAmount = isMyExpense
+    ? 0
+    : settledAmountForPair(resolvedCurrentUserId, resolvedPayerId);
+
+  const totalOutstandingForPayer = isMyExpense
+    ? roundCurrency(
+        (unsettledCounterparties ?? []).reduce((sum, split) => sum + split.outstanding, 0)
+      )
+    : 0;
+
+  const statusAmount = isMyExpense
+    ? totalOutstandingForPayer
+    : roundCurrency(myShareAmount - settledAmount);
+
+  const isSettledWithCounterparty = isMyExpense
+    ? (unsettledCounterparties?.length ?? 0) === 0
+    : statusAmount < 0.01;
 
   const splitParticipantName = (splitUserId: string) =>
     resolveSplitMemberName(
@@ -1072,7 +1038,7 @@ return (
       {activeMenuId === item.id && (
         <View style={styles.dropdown}>
 
-           {!isSettlementEntry && !isExpenseSettled && !isSettledWithCounterparty && !!counterpartyId && statusAmount >= 0.01 ? (
+           {!isSettlementEntry && !isSettledWithCounterparty && !!counterpartyId && statusAmount >= 0.01 ? (
             <Pressable
               onPress={() => {
                 setActiveMenuId(null);
@@ -1159,7 +1125,7 @@ return (
 
       <Text style={styles.metaLight}>  •  </Text>
 
-      {isSettlementEntry || isExpenseSettled || isSettledWithCounterparty || statusAmount < 0.01 ? (
+      {isSettlementEntry || isSettledWithCounterparty || statusAmount < 0.01 ? (
         <Text style={styles.settledText}>Settled</Text>
       ) : (
         <Text style={isMyExpense ? styles.owedText : styles.oweText}>
@@ -1201,6 +1167,7 @@ return (
 <View style={{ flex: 1 }}>
 
 <FlatList
+  key={`expenses-${settlements.length}`}
   data={visibleExpenses}
   keyExtractor={item => String(item.id)}
   renderItem={renderExpense}
