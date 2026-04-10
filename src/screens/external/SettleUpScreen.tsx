@@ -773,7 +773,10 @@ export default function SettleUpScreen() {
         amount: settlementAmount,
         currency: currencyCode,
         method: 'CASH',
-        notes: expenseContext?.description
+        expenseId: expenseContext?.expenseId ? String(expenseContext.expenseId) : undefined,
+        notes: expenseContext?.expenseId && expenseContext?.description
+          ? `[expense:${expenseContext.expenseId}] Settlement for ${expenseContext.description}`
+          : expenseContext?.description
           ? `Settlement for ${expenseContext.description}`
           : null,
       });
