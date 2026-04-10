@@ -31,7 +31,9 @@ export const extractSettlementExpenseId = (raw: any): string => {
   const direct = toId(
     raw?.expenseId ??
       raw?.expense_id ??
-      raw?.expense?.id
+      raw?.expense?.id ??
+      raw?.relatedExpenseId ??
+      raw?.related_expense_id
   ).trim();
 
   if (direct) {
