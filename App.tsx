@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import  AppNavigator  from './src/navigation/AppNavigator';
 import { CurrencyProvider } from './src/context/CurrencyContext';
+import { NotificationProvider } from './src/context/NotificationContext';
 
 
 const App = () => {
@@ -10,9 +11,11 @@ const App = () => {
   return (
     <SafeAreaProvider>
       <CurrencyProvider>
-        <NavigationContainer>
-          <AppNavigator/>
-        </NavigationContainer>
+        <NotificationProvider>
+          <NavigationContainer>
+            <AppNavigator/>
+          </NavigationContainer>
+        </NotificationProvider>
       </CurrencyProvider>
     </SafeAreaProvider>
   );
