@@ -16,10 +16,10 @@ import { BottomTabParamList, RootStackParamList } from '../../types/navigation';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
-import { notifications } from '../../data/mockData';
 import { Image } from 'react-native';
 import profileIcon from '../../../assets/ProfileIcon.png';
 import { useAppCurrency } from '../../context/CurrencyContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { dashboardService } from '../../services/dashboardService';
 import { groupsService } from '../../services/groupsService';
 import { settlementService } from '../../services/settlementService';
@@ -176,6 +176,7 @@ type DashboardNavigationProp = CompositeNavigationProp<
 export default function DashboardScreen() {
   const navigation = useNavigation<DashboardNavigationProp>();
   const { formatCurrency } = useAppCurrency();
+  const { notifications } = useNotifications();
 
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
