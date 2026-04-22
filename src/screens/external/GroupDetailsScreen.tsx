@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Clipboard from '@react-native-clipboard/clipboard';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
@@ -51,16 +52,30 @@ export default function GroupDetailsScreen() {
   const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
 
   const [editName, setEditName] = useState(group?.name ?? '');
   const [selectedEmoji, setSelectedEmoji] = useState(group?.emoji ?? '🏠');
 
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [emailInvite, setEmailInvite] = useState('');
   const [linkCopied, setLinkCopied] = useState(false);
 
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
+
+  const extractCreatorId = useCallback((rawGroup: any) => {
+    return String(
+      rawGroup?.creatorId ??
+      rawGroup?.creator_id ??
+      rawGroup?.createdBy ??
+      rawGroup?.created_by ??
+      rawGroup?.ownerId ??
+      rawGroup?.owner_id ??
+      rawGroup?.owner?.id ??
+      rawGroup?.creator?.id ??
+      ''
+    );
+  }, []);
 
   const roundCurrency = (value: number) => {
     return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -70,15 +85,14 @@ export default function GroupDetailsScreen() {
     const normalized = String(value ?? 'other').trim().toLowerCase();
     const iconMap: Record<string, string> = {
       food: '🍔',
-      travel: '✈️',
-      utilities: '💡',
       shopping: '🛍️',
       entertainment: '🎬',
-      other: '📦',
       work: '💼',
       rent: '🏠',
-      transport: '🚕',
+      transport: '🚗',
       grocery: '🛒',
+      bills: '🧾',
+      other: '📌',
     };
 
     return iconMap[normalized] ?? '📦';
@@ -168,11 +182,12 @@ export default function GroupDetailsScreen() {
         id: String(matched?.id ?? prev?.id ?? id),
         name: matched?.name ?? prev?.name ?? 'Group',
         emoji: matched?.emoji ?? prev?.emoji ?? '👥',
+        creatorId: extractCreatorId(matched) || prev?.creatorId || extractCreatorId(prev),
       }));
     } catch (error) {
       console.log('Failed to load group info', error);
     }
-  }, [id]);
+  }, [extractCreatorId, id]);
 
   const extractMembersPayload = (data: any) => {
     if (Array.isArray(data)) {
@@ -306,6 +321,11 @@ export default function GroupDetailsScreen() {
   };
 
   const handleDeleteGroup = async () => {
+    if (!isCurrentUserCreator) {
+      Alert.alert('Not allowed', 'Only the group creator can delete this group.');
+      return;
+    }
+
     try {
       await groupsService.deleteGroup(group?.id ?? id);
       setShowDeleteModal(false);
@@ -317,6 +337,34 @@ export default function GroupDetailsScreen() {
       );
     }
   };
+
+  const handleLeaveGroup = async () => {
+    const resolvedCurrentUserId = String(currentUserId || '').trim();
+
+    if (!resolvedCurrentUserId) {
+      Alert.alert('Leave failed', 'Could not resolve current user.');
+      return;
+    }
+
+    try {
+      await groupMembersService.removeMember(group?.id ?? id, resolvedCurrentUserId);
+      setShowLeaveModal(false);
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert(
+        'Leave failed',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
+    }
+  };
+
+  const creatorId = useMemo(() => {
+    return extractCreatorId(group);
+  }, [extractCreatorId, group]);
+
+  const isCurrentUserCreator = useMemo(() => {
+    return !!creatorId && !!currentUserId && String(creatorId) === String(currentUserId);
+  }, [creatorId, currentUserId]);
 
   // ---------------------------
   // BALANCE CALCULATIONS (moved before early return to respect React hooks rules)
@@ -473,6 +521,17 @@ export default function GroupDetailsScreen() {
     return member?.name ?? fallbackName;
   }, [group?.members]);
 
+  const handleCopyInviteLink = useCallback(() => {
+    const inviteLink = `roommate://group/${group.id}`;
+
+    Clipboard.setString(inviteLink);
+    setLinkCopied(true);
+
+    setTimeout(() => {
+      setLinkCopied(false);
+    }, 2000);
+  }, [group.id]);
+
   // ---------------------------
   // UI
   // ---------------------------
@@ -539,15 +598,29 @@ const renderAvatar = (avatar?: string | any) => {
         style={styles.menuItem}
         onPress={() => {
           setShowMenu(false);
-          setShowDeleteModal(true);
+          setShowLeaveModal(true);
           setShowEditModal(false);
         }}
       >
-        <Icon name="trash-2" size={18} color="#ff2056" />
-        <Text style={[styles.menuText, { color: '#ff2056' }]}>
-          Delete Group
-        </Text>
+        <Icon name="log-out" size={18} color="#f97316" />
+        <Text style={[styles.menuText, { color: '#f97316' }]}>Leave Group</Text>
       </TouchableOpacity>
+
+      {isCurrentUserCreator ? <View style={styles.menuDivider} /> : null}
+
+      {isCurrentUserCreator ? (
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => {
+            setShowMenu(false);
+            setShowDeleteModal(true);
+            setShowEditModal(false);
+          }}
+        >
+          <Icon name="trash-2" size={18} color="#ff2056" />
+          <Text style={[styles.menuText, { color: '#ff2056' }]}>Delete Group</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   </View>
 )}
@@ -637,6 +710,37 @@ const renderAvatar = (avatar?: string | any) => {
           onPress={handleDeleteGroup}
         >
           <Text style={{ color: '#fff' }}>Delete</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+{/* Leave Modal */}
+<Modal visible={showLeaveModal} transparent animationType="fade">
+  <View style={styles.modalOverlayy}>
+    <View style={styles.confirmCard}>
+      <Icon name="log-out" size={28} color="#f97316" />
+
+      <Text style={styles.modalTitlee}>Leave Group?</Text>
+
+      <Text style={styles.modalDescription}>
+        Are you sure you want to leave "{group.name}"? You can rejoin later with an invite link.
+      </Text>
+
+      <View style={styles.modalButtons}>
+        <TouchableOpacity
+          style={styles.cancelBtnn}
+          onPress={() => setShowLeaveModal(false)}
+        >
+          <Text>Cancel</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.leaveBtn}
+          onPress={handleLeaveGroup}
+        >
+          <Text style={{ color: '#fff' }}>Leave</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -823,56 +927,19 @@ const renderAvatar = (avatar?: string | any) => {
 
       <View style={styles.linkRow}>
         <TextInput
-          value={`https://splitwise.app/invite/${group.id}`}
+          value={`roommate://group/${group.id}`}
           editable={false}
           style={styles.linkInput}
         />
 
         <TouchableOpacity
           style={styles.copyBtn}
-          onPress={() => {
-            setLinkCopied(true);
-            setTimeout(() => setLinkCopied(false), 2000);
-          }}
+          onPress={handleCopyInviteLink}
         >
           <Icon name="copy" size={16} color="#fff" />
           <Text style={styles.copyText}>
             {linkCopied ? 'Copied' : 'Copy'}
           </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Divider */}
-      <View style={styles.dividerRow}>
-        <View style={styles.divider} />
-        <Text style={{ color: '#99a1af' }}>OR</Text>
-        <View style={styles.divider} />
-      </View>
-
-      {/* Email Invite */}
-      <Text style={styles.label}>Send Email Invite</Text>
-
-      <View style={styles.linkRow}>
-        <TextInput
-          placeholder="friend@example.com"
-          value={emailInvite}
-          onChangeText={setEmailInvite}
-          style={styles.linkInput}
-        />
-
-        <TouchableOpacity
-          disabled={!emailInvite}
-          style={[
-            styles.sendBtn,
-            !emailInvite && { backgroundColor: '#e5e7eb' }
-          ]}
-          onPress={() => {
-            setEmailInvite('');
-            setShowInviteModal(false);
-          }}
-        >
-          <Icon name="mail" size={16} color="#fff" />
-          <Text style={styles.copyText}>Send</Text>
         </TouchableOpacity>
       </View>
 
@@ -1468,6 +1535,15 @@ deleteBtn: {
   borderRadius: 14,
   alignItems: 'center',
 },
+
+leaveBtn: {
+  flex: 1,
+  backgroundColor: '#f97316',
+  padding: 14,
+  borderRadius: 14,
+  alignItems: 'center',
+},
+
 modalOverlayCenter: {
   flex: 1,
   backgroundColor: 'rgba(0,0,0,0.45)',
