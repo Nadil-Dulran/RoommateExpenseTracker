@@ -32,6 +32,8 @@ type GroupsNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
+const JOIN_GROUP_RESULT_KEY = '@roommate/join-group-result';
+
 export default function GroupsScreen() {
   const navigation = useNavigation<GroupsNavigationProp>();
   const { formatCurrency } = useAppCurrency();
@@ -42,7 +44,9 @@ export default function GroupsScreen() {
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
   const [showCreate, setShowCreate] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
   const [groupName, setGroupName] = useState('');
+  const [joinLink, setJoinLink] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🏠');
 
   const toImageUri = useCallback((value?: string | null, mimeType?: string | null) => {
@@ -170,16 +174,43 @@ export default function GroupsScreen() {
       );
 
       setGroups(groupsWithMembers);
+      return groupsWithMembers;
 
     } catch (error) {
 
       console.log('Failed to load groups', error);
 
       setGroups([]);
+      return [];
 
     }
 
   }, [normalizeGroup, normalizeMembers]);
+
+  const consumeJoinGroupResult = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem(JOIN_GROUP_RESULT_KEY);
+
+      if (!raw) {
+        return null;
+      }
+
+      await AsyncStorage.removeItem(JOIN_GROUP_RESULT_KEY);
+      const parsed = JSON.parse(raw);
+      const joinedGroupId = String(parsed?.groupId ?? '').trim();
+
+      if (!joinedGroupId) {
+        return null;
+      }
+
+      return {
+        groupId: joinedGroupId,
+        openGroupDetailsOnSuccess: !!parsed?.openGroupDetailsOnSuccess,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
 
   const loadExpenses = useCallback(async () => {
     const loadByGroups = async () => {
@@ -311,11 +342,43 @@ export default function GroupsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadGroups();
-      loadExpenses();
-      loadCurrentUserId();
-      loadSettlements();
-    }, [loadGroups, loadExpenses, loadCurrentUserId, loadSettlements])
+      let isActive = true;
+
+      const refreshAndHandleJoinResult = async () => {
+        const refreshedGroups = await loadGroups();
+        await Promise.all([loadExpenses(), loadCurrentUserId(), loadSettlements()]);
+
+        const joinResult = await consumeJoinGroupResult();
+
+        if (!isActive || !joinResult) {
+          return;
+        }
+
+        if (joinResult.openGroupDetailsOnSuccess) {
+          const matchedGroup = (refreshedGroups || []).find(
+            (group: any) => String(group?.id ?? '') === String(joinResult.groupId)
+          );
+
+          navigation.navigate('GroupDetails', {
+            id: String(joinResult.groupId),
+            group: matchedGroup,
+          });
+        }
+      };
+
+      refreshAndHandleJoinResult();
+
+      return () => {
+        isActive = false;
+      };
+    }, [
+      consumeJoinGroupResult,
+      loadGroups,
+      loadExpenses,
+      loadCurrentUserId,
+      loadSettlements,
+      navigation,
+    ])
   );
 
   const groupBalances = useMemo(() => {
@@ -396,6 +459,33 @@ export default function GroupsScreen() {
 
   };
 
+  const extractGroupIdFromLink = useCallback((value: string) => {
+    const normalized = String(value || '').trim();
+
+    if (!normalized) {
+      return '';
+    }
+
+    const linkMatch = normalized.match(/group\/([^/?#]+)/i);
+    return linkMatch?.[1] ? linkMatch[1] : normalized;
+  }, []);
+
+  const handleJoinGroup = () => {
+    const targetGroupId = extractGroupIdFromLink(joinLink);
+
+    if (!targetGroupId) {
+      Alert.alert('Invalid link', 'Please paste a valid group invite link.');
+      return;
+    }
+
+    setJoinLink('');
+    setShowJoin(false);
+    navigation.navigate('JoinGroup', {
+      groupId: targetGroupId,
+      openGroupDetailsOnSuccess: true,
+    });
+  };
+
   const emojis: string[] = [
   '🏠','✈️','📄','🎉','🍕','🎬','⚽','🎵',
   '🏖️','🎮','🍺','🛒','💼','🎓','🏋','🎸'
@@ -412,7 +502,17 @@ export default function GroupsScreen() {
             <Text style={styles.subtitle}>
               Manage your expense groups
             </Text>
+
+            
           </View>
+
+          <TouchableOpacity
+              style={styles.joinHeaderButton}
+              onPress={() => setShowJoin(true)}
+            >
+              <Icon name="link" size={14} color="#fff" />
+              <Text style={styles.joinHeaderButtonText}>Join Group</Text>
+            </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.addButton}
@@ -596,6 +696,67 @@ export default function GroupsScreen() {
   </View>
 )}
 
+      {showJoin && (
+        <View style={styles.overlay}>
+          <View style={styles.modalCard}>
+
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Join Group</Text>
+              <TouchableOpacity onPress={() => setShowJoin(false)}>
+                <Icon name="x" size={22} color="#6A7282" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalDescription}>
+              Paste a roommate invite link to join a group
+            </Text>
+
+            <Text style={styles.label}>Invite Link</Text>
+            <TextInput
+              value={joinLink}
+              onChangeText={setJoinLink}
+              placeholder="roommate://group/123"
+              placeholderTextColor="#99A1AF"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.input}
+            />
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowJoin(false)}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                disabled={!joinLink.trim()}
+                style={[
+                  styles.createBtn,
+                  !joinLink.trim() && styles.disabledBtn,
+                ]}
+                onPress={handleJoinGroup}
+              >
+                <Icon
+                  name="check"
+                  size={16}
+                  color={joinLink.trim() ? '#fff' : '#9CA3AF'}
+                />
+                <Text
+                  style={[
+                    styles.createText,
+                    !joinLink.trim() && { color: '#9CA3AF' },
+                  ]}
+                >
+                  Join Group
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
 
     </View>
   );
@@ -629,11 +790,30 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
+  joinHeaderButton: {
+    marginTop: 12,
+    backgroundColor: '#009966',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 8,
+  },
+
+  joinHeaderButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
   addButton: {
     backgroundColor: '#009966',
     padding: 10,
     borderRadius: 20,
     bottom: 5,
+    top: 3,
   },
 
   groupCard: {
