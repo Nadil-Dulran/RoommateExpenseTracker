@@ -602,8 +602,8 @@ const renderAvatar = (avatar?: string | any) => {
           setShowEditModal(false);
         }}
       >
-        <Icon name="log-out" size={18} color="#f97316" />
-        <Text style={[styles.menuText, { color: '#f97316' }]}>Leave Group</Text>
+        <Icon name="log-out" size={18} color="#ff2056" />
+        <Text style={[styles.menuText, { color: '#ff2056' }]}>Leave Group</Text>
       </TouchableOpacity>
 
       {isCurrentUserCreator ? <View style={styles.menuDivider} /> : null}
@@ -720,7 +720,7 @@ const renderAvatar = (avatar?: string | any) => {
 <Modal visible={showLeaveModal} transparent animationType="fade">
   <View style={styles.modalOverlayy}>
     <View style={styles.confirmCard}>
-      <Icon name="log-out" size={28} color="#f97316" />
+      <Icon name="log-out" size={28} color="#ff2056" />
 
       <Text style={styles.modalTitlee}>Leave Group?</Text>
 
@@ -1236,7 +1236,7 @@ const styles = StyleSheet.create({
   groupName: {
     fontSize: 25,
     fontWeight: 'bold',
-    marginBottom: 7,
+    marginBottom: 5,
   },
 
   balanceCard: {
@@ -1347,6 +1347,7 @@ const styles = StyleSheet.create({
   avatarStack: {
    flexDirection: 'row',
    marginRight: 8,
+   marginBottom: 8,
 },
 
 avatar: {
@@ -1538,7 +1539,7 @@ deleteBtn: {
 
 leaveBtn: {
   flex: 1,
-  backgroundColor: '#f97316',
+  backgroundColor: '#ff2056',
   padding: 14,
   borderRadius: 14,
   alignItems: 'center',
