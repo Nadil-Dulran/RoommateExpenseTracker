@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import  Login  from "../screens/authentication/LoginScreen";
 import Signup  from "../screens/authentication/SignupScreen";
@@ -9,6 +10,7 @@ import SettleUpScreen from '../screens/external/SettleUpScreen';
 import NotificationScreen from '../screens/external/NotificationScreen';
 import { RootStackParamList } from '../types/navigation';
 import GroupDetailsScreen from '../screens/external/GroupDetailsScreen';
+import JoinGroupScreen from '../screens/external/JoinGroupScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -32,6 +34,15 @@ const AppNavigator = () => {
       checkToken();
     }, []);
 
+    const linking = {
+    prefixes: ['roommate://'],
+    config: {
+    screens: {
+      JoinGroup: 'group/:groupId',
+    },
+  },
+};
+
     if (isLoading) {
       return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -41,27 +52,28 @@ const AppNavigator = () => {
     }
 
     return (
-     
-      <Stack.Navigator
-        initialRouteName={initialRoute}
-        screenOptions={{ headerShown: false }}
-      >
-      {/* Auth Screens */}
+      <NavigationContainer linking={linking}>
+        <Stack.Navigator
+          initialRouteName={initialRoute}
+          screenOptions={{ headerShown: false }}
+        >
+          {/* Auth Screens */}
 
-      <Stack.Screen name="Login" component={Login} />
-      <Stack.Screen name="Signup" component={Signup} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+          <Stack.Screen name="Login" component={Login} />
+          <Stack.Screen name="Signup" component={Signup} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
 
-      {/* Main Screens */}
-      <Stack.Screen name="MainTabs" component={BottomTabs} />
+          {/* Main Screens */}
+          <Stack.Screen name="MainTabs" component={BottomTabs} />
 
-      {/* External Screens */}
-      <Stack.Screen name="SettleUp" component={SettleUpScreen} />
-      <Stack.Screen name="Notifications" component={NotificationScreen} />
-      <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
-
-    </Stack.Navigator>
-  );
+          {/* External Screens */}
+          <Stack.Screen name="SettleUp" component={SettleUpScreen} />
+          <Stack.Screen name="Notifications" component={NotificationScreen} />
+          <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
+          <Stack.Screen name="JoinGroup" component={JoinGroupScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    );
 };
 
 export default AppNavigator;
