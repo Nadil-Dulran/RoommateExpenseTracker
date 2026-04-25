@@ -1,3 +1,5 @@
+import { NavigatorScreenParams } from '@react-navigation/native';
+
 export type SettleUpExpenseSplit = {
   userId: string;
   amount: number;
@@ -19,7 +21,7 @@ export type RootStackParamList = {
   Signup: undefined;
   ForgotPassword: undefined;
 
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<BottomTabParamList> | undefined;
 
   SettleUp:
     | { mode: 'all'; groupId?: string }
@@ -35,6 +37,12 @@ export type RootStackParamList = {
 
   Notifications: undefined;
   GroupDetails: { id: string; group?: any };
+  JoinGroup:
+    | {
+        groupId?: string;
+        openGroupDetailsOnSuccess?: boolean;
+      }
+    | undefined;
 };
 
 export type BottomTabParamList = {
