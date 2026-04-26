@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,43 +9,160 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
-import { notifications as initialNotifications, categories } from '../../data/mockData';
 import { Notification } from '../../types/notification';
-import { currentUser } from '../../data/mockData';
+import { useAppCurrency } from '../../context/CurrencyContext';
+import { useNotifications } from '../../context/NotificationContext';
 
+const toImageUri = (value?: string | null, mimeType = 'image/jpeg') => {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (
+    normalized.startsWith('http://') ||
+    normalized.startsWith('https://') ||
+    normalized.startsWith('data:image')
+  ) {
+    return normalized;
+  }
+
+  const compact = normalized.replace(/\s/g, '');
+  return `data:${mimeType};base64,${compact}`;
+};
+
+const stripExpenseTag = (value?: string | null) => {
+  const text = String(value ?? '');
+  return text
+    .replace(/\[expense:[^\]]+\]\s*/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
 
 const NotificationsScreen = () => {
   const navigation = useNavigation<any>();
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const { formatCurrency } = useAppCurrency();
+  const {
+    notifications,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications();
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
-    );
+  const unreadCount = notifications.filter(item => !item.read).length;
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const getUserShareAmount = (item: Notification) => {
+    const directAmount = item.data?.amount ?? item.data?.userShareAmount ?? item.data?.user_share_amount;
+    if (directAmount != null) {
+      const parsed = Number(directAmount);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    const directShare = (item as any)?.userShareAmount ?? (item as any)?.user_share_amount;
+    if (directShare != null) {
+      const parsed = Number(directShare);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    const firstSplitAmount = item.expense?.splits?.[0]?.amount;
+    if (firstSplitAmount != null) {
+      const parsed = Number(firstSplitAmount);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    return undefined;
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const getSettlementSummary = (item: Notification) => {
+    if (item.type !== 'expense_settled') {
+      return null;
+    }
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-};
-
-const renderItem = ({ item }: { item: Notification }) => {
-    const category = item.expense
-      ? categories[item.expense.category as keyof typeof categories]
-      : null;
-
-    const userShare = item.expense?.splits.find(
-      (s: any) => s.userId === currentUser.id
+    const data = item.data ?? {};
+    const notes = stripExpenseTag(
+      data.settlement?.description ??
+      data.settlementDescription ??
+      data.expense?.description ??
+      data.expenseDescription ??
+      data.description ??
+      ''
     );
+
+    const method = String(
+      data.settlement?.method ??
+      data.method ??
+      data.settlementMethod ??
+      ''
+    ).trim();
+
+    const payerName = String(
+      data.settlement?.payerName ??
+      data.payerName ??
+      data.fromUser?.name ??
+      data.fromName ??
+      item.relatedUser?.name ??
+      ''
+    ).trim();
+
+    const receiverName = String(
+      data.settlement?.receiverName ??
+      data.receiverName ??
+      data.toUser?.name ??
+      data.toName ??
+      ''
+    ).trim();
+
+    const pieces: string[] = [];
+
+    if (notes) {
+      pieces.push(notes);
+    }
+
+    if (payerName && receiverName) {
+      pieces.push(`${payerName} → ${receiverName}`);
+    } else if (payerName) {
+      pieces.push(`By ${payerName}`);
+    }
+
+    if (method) {
+      pieces.push(method.toUpperCase());
+    }
+
+    const summary = pieces.join(' • ').trim();
+    return summary || null;
+  };
+
+  const renderItem = ({ item }: { item: Notification }) => {
+    
+
+    const avatarMimeType ='image/jpeg';
+
+    const avatarUri = toImageUri(
+      item.data?.relatedUser?.avatar_base64 ??
+      null,
+      avatarMimeType
+    );
+
+    const avatarSource =
+      typeof avatarUri === 'string' && avatarUri.length > 0
+        ? { uri: avatarUri }
+        : require('../../../assets/ProfileIcon.png');
+
+    const shareAmount = getUserShareAmount(item);
+    const cleanMessage = stripExpenseTag(item.message);
 
     return (
       <TouchableOpacity
@@ -57,17 +174,11 @@ const renderItem = ({ item }: { item: Notification }) => {
         ]}
       >
         <View style={styles.row}>
-          {/* Avatar */}
           <View style={styles.avatarContainer}>
             <Image
-            source={
-            //  item.relatedUser?.avatar
-              //   ? { uri: item.relatedUser.avatar }
-                    //  : 
-                      require('../../../assets/ProfileIcon.png') // fallback image
-            }
-  style={styles.avatar}
-/>
+              source={avatarSource}
+              style={styles.avatar}
+            />
 
             <View
               style={[
@@ -92,24 +203,22 @@ const renderItem = ({ item }: { item: Notification }) => {
             </View>
           </View>
 
-          {/* Content */}
           <View style={{ flex: 1 }}>
             <View style={styles.titleRow}>
-              <Text style={styles.message}>
+              <View style={styles.messageBlock}>
                 <Text style={styles.bold}>
-                   {item.relatedUser?.name ?? 'User'}
-                </Text>{' '}
-                <Text style={styles.light}>
-                  {item.message}
+                  {item.title ?? item.relatedUser?.name ?? 'Notification'}
                 </Text>
-              </Text>
+                <Text style={styles.light}>
+                  {cleanMessage || item.message}
+                </Text>
+              </View>
 
               {!item.read && (
                 <View style={styles.unreadDot} />
               )}
             </View>
 
-            {/* Group Info */}
             <View style={styles.metaRow}>
               <Text style={styles.metaText}>
                 {item.groupEmoji} {item.groupName}
@@ -120,32 +229,26 @@ const renderItem = ({ item }: { item: Notification }) => {
               </Text>
             </View>
 
-            {/* Amount */}
-            {item.expense && userShare && (
+            {shareAmount != null && (
               <View
                 style={[
                   styles.amountPill,
-                  item.type === 'expense_settled' &&
-                    styles.settledPill,
+                  item.type === 'expense_settled' && styles.settledPill,
                 ]}
               >
-                {category && (
-                  <Text style={styles.categoryIcon}>
-                    {category.icon}
-                  </Text>
-                )}
+                
 
                 <Text
                   style={[
                     styles.amountText,
-                    item.type === 'expense_settled' &&
-                      styles.settledText,
+                    item.type === 'expense_settled' && styles.settledText,
                   ]}
                 >
-                  ${userShare.amount.toFixed(2)}
+                 <Text>Amount: </Text> {formatCurrency(shareAmount)}
                 </Text>
               </View>
             )}
+
           </View>
         </View>
       </TouchableOpacity>
@@ -154,7 +257,6 @@ const renderItem = ({ item }: { item: Notification }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -180,12 +282,16 @@ const renderItem = ({ item }: { item: Notification }) => {
         )}
       </View>
 
-      {/* List */}
       <FlatList<Notification>
         data={notifications}
-        keyExtractor={item => item.id}
+        keyExtractor={item => String(item.id)}
         renderItem={renderItem}
-        contentContainerStyle={{ padding: 16 }}
+        ListEmptyComponent={
+          <View style={styles.centeredState}>
+            <Text style={styles.emptyText}>No unread notifications</Text>
+          </View>
+        }
+        contentContainerStyle={{ padding: 16, flexGrow: 1 }}
       />
     </View>
   );
@@ -250,7 +356,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'relative',
-    top: -13,  
+    top: -13,
     right: -28,
     width: 20,
     height: 20,
@@ -264,6 +370,10 @@ const styles = StyleSheet.create({
   },
   message: {
     fontSize: 13,
+    flex: 1,
+    marginRight: 6,
+  },
+  messageBlock: {
     flex: 1,
     marginRight: 6,
   },
@@ -322,5 +432,15 @@ const styles = StyleSheet.create({
   },
   settledText: {
     color: '#009966',
+  },
+  centeredState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#6A7282',
+    marginBottom: 6,
   },
 });
