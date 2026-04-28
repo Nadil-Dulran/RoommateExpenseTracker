@@ -137,6 +137,10 @@ export default function ExpensesScreen() {
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [settlements, setSettlements] = useState<Settlement[]>([]);
 
+  const buildPairKey = (groupId: string, payerId: string, receiverId: string) => {
+    return `${String(groupId || '')}:${String(payerId || '')}:${String(receiverId || '')}`;
+  };
+
   const roundCurrency = (value: number) => {
     return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
   };
@@ -557,7 +561,8 @@ const handleDelete = (item: Expense) => {
     useCallback(() => {
       loadCurrentUserId();
       reloadAllData();
-    }, [loadCurrentUserId, reloadAllData])
+      loadSettlementsForCurrentGroups();
+    }, [loadCurrentUserId, reloadAllData, loadSettlementsForCurrentGroups])
   );
 
   useEffect(() => {
@@ -915,6 +920,76 @@ const handleDelete = (item: Expense) => {
     return map;
   }, [settlements]);
 
+  const settledAmountByPair = useMemo(() => {
+    const map = new Map<string, number>();
+
+    settlements.forEach(settlement => {
+      const groupId = String(settlement.groupId || '');
+      const payerId = String(settlement.payerId || '');
+      const receiverId = String(settlement.receiverId || '');
+      const amount = Number(settlement.amount || 0);
+
+      if (!groupId || !payerId || !receiverId || amount <= 0) {
+        return;
+      }
+
+      const key = buildPairKey(groupId, payerId, receiverId);
+      map.set(key, roundCurrency((map.get(key) ?? 0) + amount));
+    });
+
+    return map;
+  }, [settlements]);
+
+  const outstandingAmountByPair = useMemo(() => {
+    const map = new Map<string, number>();
+    const me = String(currentUserId || '');
+
+    if (!me) {
+      return map;
+    }
+
+    expenses.forEach(expense => {
+      if (isSettlementDescription(expense.description)) {
+        return;
+      }
+
+      const groupId = String(expense.groupId || '');
+      const paidById = String(expense.paidBy?.id || '');
+      const splits = Array.isArray(expense.splits) ? expense.splits : [];
+
+      if (!groupId) {
+        return;
+      }
+
+      if (paidById === me) {
+        splits.forEach(split => {
+          const splitUserId = String(split.userId || '');
+          const splitAmount = Number(split.amount || 0);
+
+          if (!splitUserId || splitUserId === me || splitAmount <= 0) {
+            return;
+          }
+
+          const key = buildPairKey(groupId, splitUserId, me);
+          map.set(key, roundCurrency((map.get(key) ?? 0) + splitAmount));
+        });
+        return;
+      }
+
+      const mySplit = splits.find(split => String(split.userId || '') === me);
+      const myShareAmount = Number(mySplit?.amount || 0);
+
+      if (!paidById || myShareAmount <= 0) {
+        return;
+      }
+
+      const key = buildPairKey(groupId, me, paidById);
+      map.set(key, roundCurrency((map.get(key) ?? 0) + myShareAmount));
+    });
+
+    return map;
+  }, [expenses, currentUserId]);
+
   const visibleExpenses = useMemo(() => {
     return expenses.filter(expense => !isSettlementDescription(expense.description));
   }, [expenses]);
@@ -925,6 +1000,12 @@ const handleDelete = (item: Expense) => {
   const paidBy = item.paidBy ?? { id: '', name: 'Unknown' };
   const group = getGroupInfo(item.groupId);
   const resolvedCurrentUserId = String(currentUserId || '');
+  const resolvedGroupId = String(item.groupId ?? '');
+
+  const groupMembers = (group?.members ?? []) as GroupMember[];
+
+  const uniqueNonEmpty = (values: string[]) => Array.from(new Set(values.map(v => String(v || '').trim()).filter(Boolean)));
+  const normalizeName = (value?: string | null) => String(value || '').trim().toLowerCase();
 
   const normalizedSplits = splits
     .map(split => ({
@@ -937,9 +1018,41 @@ const handleDelete = (item: Expense) => {
     paidBy.name && paidBy.name !== 'Unknown'
       ? paidBy.name
       : group?.members?.find((member: any) => String(member.id) === String(paidBy.id))?.name ?? 'Unknown';
+
+  const normalizedPaidByName = normalizeName(paidByName);
+  const payerIdCandidates = uniqueNonEmpty([
+    String(paidBy.id ?? ''),
+    ...groupMembers
+      .filter((member: GroupMember) => normalizeName(member?.name) === normalizedPaidByName)
+      .map((member: GroupMember) => String(member?.id ?? '')),
+    ...settlements
+      .filter(settlement => String(settlement.groupId || '') === resolvedGroupId)
+      .filter(settlement => normalizeName(settlement.payerName) === normalizedPaidByName)
+      .map(settlement => String(settlement.payerId || '')),
+  ]);
+
+  const currentUserName =
+    groupMembers.find((member: GroupMember) => String(member.id) === resolvedCurrentUserId)?.name ?? '';
+  const normalizedCurrentUserName = normalizeName(currentUserName);
+  const currentUserIdCandidates = uniqueNonEmpty([
+    resolvedCurrentUserId,
+    ...groupMembers
+      .filter((member: GroupMember) => normalizeName(member?.name) === normalizedCurrentUserName)
+      .map((member: GroupMember) => String(member?.id ?? '')),
+    ...settlements
+      .filter(settlement => String(settlement.groupId || '') === resolvedGroupId)
+      .filter(settlement => normalizeName(settlement.payerName) === normalizedCurrentUserName)
+      .map(settlement => String(settlement.payerId || '')),
+    ...settlements
+      .filter(settlement => String(settlement.groupId || '') === resolvedGroupId)
+      .filter(settlement => normalizeName(settlement.receiverName) === normalizedCurrentUserName)
+      .map(settlement => String(settlement.receiverId || '')),
+  ]);
+
+  const isMyExpense = payerIdCandidates.some(candidateId => currentUserIdCandidates.includes(candidateId));
+
   const myShareAmount =
-    normalizedSplits.find(split => String(split.userId) === String(resolvedCurrentUserId))?.amount ?? 0;
-  const isMyExpense = String(paidBy.id) === String(resolvedCurrentUserId);
+    normalizedSplits.find(split => currentUserIdCandidates.includes(String(split.userId)))?.amount ?? 0;
 
   const isSettlementEntry = isSettlementDescription(item.description);
   const expenseSettlements = settlementsByExpenseId.get(String(item.id)) ?? [];
@@ -952,16 +1065,102 @@ const handleDelete = (item: Expense) => {
     );
   };
 
-  const resolvedPayerId = String(paidBy.id ?? '');
+  const settledAmountForReceiverCandidates = (payerId: string, receiverIds: string[]) => {
+    return roundCurrency(
+      receiverIds.reduce((sum, receiverId) => sum + settledAmountForPair(payerId, receiverId), 0)
+    );
+  };
+
+  const sumPairMapAcrossCandidates = (
+    map: Map<string, number>,
+    payerIds: string[],
+    receiverIds: string[]
+  ) => {
+    return roundCurrency(
+      payerIds.reduce((sum, payerId) => {
+        const receiverTotal = receiverIds.reduce((inner, receiverId) => {
+          const key = buildPairKey(resolvedGroupId, payerId, receiverId);
+          return inner + (map.get(key) ?? 0);
+        }, 0);
+
+        return sum + receiverTotal;
+      }, 0)
+    );
+  };
+
+  const resolvedPayerId = String(payerIdCandidates[0] ?? paidBy.id ?? '');
+  const pairTotalOutstandingCurrentToPayer = roundCurrency(
+    payerIdCandidates.reduce((sum, payerId) => {
+      const pairOutstandingFromCandidate = currentUserIdCandidates.reduce((inner, currentCandidateId) => {
+        const key = buildPairKey(resolvedGroupId, currentCandidateId, payerId);
+        return inner + (outstandingAmountByPair.get(key) ?? 0);
+      }, 0);
+
+      return sum + pairOutstandingFromCandidate;
+    }, 0)
+  );
+  const pairTotalSettledCurrentToPayer = roundCurrency(
+    payerIdCandidates.reduce((sum, payerId) => {
+      const pairSettledFromCandidate = currentUserIdCandidates.reduce((inner, currentCandidateId) => {
+        const key = buildPairKey(resolvedGroupId, currentCandidateId, payerId);
+        return inner + (settledAmountByPair.get(key) ?? 0);
+      }, 0);
+
+      return sum + pairSettledFromCandidate;
+    }, 0)
+  );
+
+  const isPairFullySettledCurrentToPayer =
+    pairTotalOutstandingCurrentToPayer > 0 &&
+    pairTotalSettledCurrentToPayer >= pairTotalOutstandingCurrentToPayer - 0.01;
+
   const unsettledCounterparties = isMyExpense
     ? normalizedSplits
-        .filter(split => String(split.userId) !== String(resolvedCurrentUserId))
+        .filter(split => !currentUserIdCandidates.includes(String(split.userId)))
         .map(split => {
-          const settledAmount = settledAmountForPair(String(split.userId), resolvedCurrentUserId);
+          const splitMemberName =
+            groupMembers.find((member: GroupMember) => String(member.id) === String(split.userId))?.name ?? '';
+          const normalizedSplitMemberName = normalizeName(splitMemberName);
+
+          const splitMemberPayerCandidates = uniqueNonEmpty([
+            String(split.userId),
+            ...groupMembers
+              .filter((member: GroupMember) => normalizeName(member?.name) === normalizedSplitMemberName)
+              .map((member: GroupMember) => String(member?.id ?? '')),
+            ...settlements
+              .filter(settlement => String(settlement.groupId || '') === resolvedGroupId)
+              .filter(settlement => normalizeName(settlement.payerName) === normalizedSplitMemberName)
+              .map(settlement => String(settlement.payerId || '')),
+          ]);
+
+          const expenseSpecificSettled = roundCurrency(
+            splitMemberPayerCandidates.reduce((sum, splitPayerId) => {
+              return sum + settledAmountForReceiverCandidates(splitPayerId, currentUserIdCandidates);
+            }, 0)
+          );
+
+          const pairOutstandingTotal = sumPairMapAcrossCandidates(
+            outstandingAmountByPair,
+            splitMemberPayerCandidates,
+            currentUserIdCandidates
+          );
+          const pairSettledTotal = sumPairMapAcrossCandidates(
+            settledAmountByPair,
+            splitMemberPayerCandidates,
+            currentUserIdCandidates
+          );
+
+          const isThisPairFullySettled =
+            pairOutstandingTotal > 0 && pairSettledTotal >= pairOutstandingTotal - 0.01;
+
+          const settledAmount = isThisPairFullySettled
+            ? roundCurrency(split.amount)
+            : Math.min(roundCurrency(split.amount), expenseSpecificSettled);
+
           return {
             userId: String(split.userId),
             amount: roundCurrency(split.amount),
-            outstanding: roundCurrency(split.amount - settledAmount),
+            outstanding: roundCurrency(Math.max(0, split.amount - settledAmount)),
           };
         })
         .filter(split => split.outstanding >= 0.01)
@@ -981,7 +1180,13 @@ const handleDelete = (item: Expense) => {
 
   const settledAmount = isMyExpense
     ? 0
-    : settledAmountForPair(resolvedCurrentUserId, resolvedPayerId);
+    : roundCurrency(
+        currentUserIdCandidates.reduce(
+          (sum, currentCandidateId) =>
+            sum + settledAmountForReceiverCandidates(currentCandidateId, payerIdCandidates),
+          0
+        )
+      );
 
   const totalOutstandingForPayer = isMyExpense
     ? roundCurrency(
@@ -993,9 +1198,13 @@ const handleDelete = (item: Expense) => {
     ? totalOutstandingForPayer
     : roundCurrency(myShareAmount - settledAmount);
 
+  const effectiveStatusAmount = !isMyExpense && isPairFullySettledCurrentToPayer
+    ? 0
+    : statusAmount;
+
   const isSettledWithCounterparty = isMyExpense
     ? (unsettledCounterparties?.length ?? 0) === 0
-    : statusAmount < 0.01;
+    : effectiveStatusAmount < 0.01;
 
   const splitParticipantName = (splitUserId: string) =>
     resolveSplitMemberName(
@@ -1038,14 +1247,14 @@ return (
       {activeMenuId === item.id && (
         <View style={styles.dropdown}>
 
-           {!isSettlementEntry && !isSettledWithCounterparty && !!counterpartyId && statusAmount >= 0.01 ? (
+           {!isSettlementEntry && !isSettledWithCounterparty && !!counterpartyId && effectiveStatusAmount >= 0.01 ? (
             <Pressable
               onPress={() => {
                 setActiveMenuId(null);
                 navigation.navigate('SettleUp', {
                   mode: 'single',
                   memberId: String(counterpartyId),
-                  amount: statusAmount,
+                  amount: effectiveStatusAmount,
                   memberName: counterpartyName,
                   isYouPaying: !isMyExpense,
                   groupId: String(item.groupId),
@@ -1125,12 +1334,12 @@ return (
 
       <Text style={styles.metaLight}>  •  </Text>
 
-      {isSettlementEntry || isSettledWithCounterparty || statusAmount < 0.01 ? (
+      {isSettlementEntry || isSettledWithCounterparty || effectiveStatusAmount < 0.01 ? (
         <Text style={styles.settledText}>Settled</Text>
       ) : (
         <Text style={isMyExpense ? styles.owedText : styles.oweText}>
           {isMyExpense ? 'You are owed: ' : 'You owe: '}
-          {formatCurrency(statusAmount)}
+          {formatCurrency(effectiveStatusAmount)}
         </Text>
       )}
     </View>
