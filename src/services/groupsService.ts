@@ -101,6 +101,43 @@ export const groupsService = {
     });
 
     return parseResponse(response);
+  },
+
+  async joinGroup(id: string | number, userId?: string | number) {
+
+    const token = await getTokenOrThrow();
+    const candidateRequests: Array<{ url: string; body?: Record<string, unknown> }> = [
+      { url: `${GROUPS_API_URL}/${id}/join` },
+      { url: `${GROUPS_API_URL}/${id}/members/me` },
+      userId != null
+        ? { url: `${GROUPS_API_URL}/${id}/members`, body: { userId } }
+        : { url: `${GROUPS_API_URL}/${id}/members` },
+    ];
+
+    for (const candidate of candidateRequests) {
+      const response = await fetch(candidate.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(candidate.body ?? {}),
+      });
+
+      const body = await parseJson(response);
+
+      if (response.ok) {
+        return body;
+      }
+
+      if (response.status === 404 || response.status === 405) {
+        continue;
+      }
+
+      throw new Error(body?.message || 'Failed to join group');
+    }
+
+    throw new Error('Group join route/method not found');
   }
 
 };
