@@ -24,7 +24,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     window = UIWindow(frame: UIScreen.main.bounds)
 
     factory.startReactNative(
-      withModuleName: "RoommateExpenseTracker",
+      withModuleName: "io.akva.ret",
       in: window,
       launchOptions: launchOptions
     )
