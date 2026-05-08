@@ -7,6 +7,8 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  Modal,
+  Clipboard,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
@@ -36,6 +38,14 @@ export default function SignupScreen() {
   const [errors, setErrors] = useState<any>({});
   const [statusMessage, setStatusMessage] = useState('');
   const [statusType, setStatusType] = useState<'success' | 'error' | ''>('');
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
+
+  const handleCopyEmail = async () => {
+    await Clipboard.setString('nadil.dulran@akvasoft.com');
+    setEmailCopied(true);
+    setTimeout(() => setEmailCopied(false), 2000);
+  };
 
   const handleChange = (field: string, value: string) => {
     setFormData({ ...formData, [field]: value });
@@ -134,7 +144,7 @@ export default function SignupScreen() {
         <View style={styles.card}>
 
           {/* Name */}
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={styles.label}>User Name </Text>
           <View style={[
             styles.inputWrapper,
             errors.name && styles.errorBorder,
@@ -142,7 +152,8 @@ export default function SignupScreen() {
             <Icon name="user" size={18} color="#9CA3AF" />
             <TextInput
               style={styles.input}
-              placeholder="Enter your full name"
+              placeholder="Enter a username for your profile"
+              placeholderTextColor="#9CA3AF"
               value={formData.name}
               onChangeText={(text) => handleChange('name', text)}
             />
@@ -159,6 +170,7 @@ export default function SignupScreen() {
             <TextInput
               style={styles.input}
               placeholder="you@example.com"
+              placeholderTextColor="#9CA3AF"
               value={formData.email}
               onChangeText={(text) => handleChange('email', text)}
             />
@@ -175,6 +187,7 @@ export default function SignupScreen() {
             <TextInput
               style={styles.input}
               placeholder="Enter your phone number"
+              placeholderTextColor="#9CA3AF"
               value={formData.phone}
               onChangeText={(text) => handleChange('phone', text)}
             />
@@ -191,6 +204,7 @@ export default function SignupScreen() {
             <TextInput
               style={styles.input}
               placeholder='Enter a strong password'
+              placeholderTextColor="#9CA3AF"
               secureTextEntry={!showPassword}
               value={formData.password}
               onChangeText={(text) => handleChange('password', text)}
@@ -200,7 +214,7 @@ export default function SignupScreen() {
               <Icon
                 name={showPassword ? 'eye' : 'eye-off'}
                 size={18}
-                color="#000000"
+                color="#9CA3AF"
               />
             </TouchableOpacity>
           </View>
@@ -216,6 +230,7 @@ export default function SignupScreen() {
             <TextInput
               style={styles.input}
               placeholder='Re enter the password'
+              placeholderTextColor="#9CA3AF"
               secureTextEntry={!showConfirmPassword}
               value={formData.confirmPassword}
               onChangeText={(text) => handleChange('confirmPassword', text)}
@@ -225,7 +240,7 @@ export default function SignupScreen() {
               <Icon
                 name={showConfirmPassword ? 'eye' : 'eye-off'}
                 size={18}
-                color="#000000"
+                color="#9CA3AF"
               />
             </TouchableOpacity>
           </View>
@@ -233,13 +248,20 @@ export default function SignupScreen() {
             <Text style={styles.error}>{errors.confirmPassword}</Text>
           )}
 
-          {/* Terms */}
-          <Text style={styles.terms}>
-            By signing up, you agree to our
-            <Text style={styles.link}> Terms of Service </Text>
-            and
-            <Text style={styles.link}> Privacy Policy</Text>
-          </Text>
+          {/* Terms Agreement */}
+          <View style={styles.termsContainer}>
+            <Text style={styles.termsText}>
+              By signing up, you agree to our
+            </Text>
+            <TouchableOpacity 
+              style={styles.termsButton}
+              onPress={() => setShowTermsModal(true)}
+            >
+              <Icon name="file-text" size={16} color="#009966" style={{ marginRight: 6 }} />
+              <Text style={styles.termsLink}>Terms of Service & Privacy Policy</Text>
+              <Icon name="arrow-right" size={16} color="#009966" style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
+          </View>
 
           {/* Create Account */}
           <TouchableOpacity
@@ -265,26 +287,26 @@ export default function SignupScreen() {
           ) : null}
 
           {/* Divider */}
-          <View style={styles.divider}>
+          {/* <View style={styles.divider}>
             <View style={styles.line} />
             <Text style={styles.or}>OR</Text>
             <View style={styles.line} />
-          </View>
+          </View> */}
 
          {/* Google */}
-          <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
+          {/* <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
             <Image source={googleIcon} style={styles.socialIcon} />
             <Text style={styles.socialText}>Continue with Google</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           {/* Facebook */}
-          <TouchableOpacity style={styles.socialButton} onPress={handleFacebookLogin}>
+          {/* <TouchableOpacity style={styles.socialButton} onPress={handleFacebookLogin}>
             <Image source={facebookIcon} style={styles.socialIcon} />
             <Text style={styles.socialText}>Continue with Facebook</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
         </View>
-
+   </ScrollView>
         {/* Login */}
         <View style={styles.bottomRow}>
           <Text style={{ color: '#6a7282' }}>
@@ -296,18 +318,118 @@ export default function SignupScreen() {
           </TouchableOpacity>
         </View>
 
-      </ScrollView>
+        {/* Terms Modal */}
+        <Modal
+          visible={showTermsModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowTermsModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              {/* Modal Header */}
+              <View style={styles.modalHeader}>
+                <View style={styles.documentIconCircle}>
+                  <Icon name="file-text" size={24} color="#009966" />
+                </View>
+                <Text style={styles.modalTitle}>Terms of Service & Privacy Policy</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setShowTermsModal(false)}
+                >
+                  <Icon name="x" size={24} color="#6a7282" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Modal Body - Scrollable */}
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={true}>
+                <View style={styles.modalBody}>
+                  <Text style={styles.sectionTitle}>Data Access & Storage</Text>
+                  
+                  <View style={styles.policySection}>
+                    <Icon name="wifi" size={18} color="#009966" />
+                    <View style={styles.policyText}>
+                      <Text style={styles.policyLabel}>Internet Access</Text>
+                      <Text style={styles.policyDescription}>
+                        Our application requires internet access to connect to our servers and provide real-time updates for expense tracking, group management and settlement calculations.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.policySection}>
+                    <Icon name="database" size={18} color="#009966" />
+                    <View style={styles.policyText}>
+                      <Text style={styles.policyLabel}>Data Storage</Text>
+                      <Text style={styles.policyDescription}>
+                        Your signup data including name, email, phone number and profile information are securely stored on our encrypted databases to provide you with a seamless experience across devices.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.policySection}>
+                    <Icon name="lock" size={18} color="#009966" />
+                    <View style={styles.policyText}>
+                      <Text style={styles.policyLabel}>Password Security</Text>
+                      <Text style={styles.policyDescription}>
+                        Your password is encrypted using industry-standard hashing algorithms (bcrypt/SHA-256). We never store plain-text passwords. Our servers employ end-to-end encryption and regular security audits to protect your data.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.policySection}>
+                    <Icon name="shield" size={18} color="#009966" />
+                    <View style={styles.policyText}>
+                      <Text style={styles.policyLabel}>Privacy Commitment</Text>
+                      <Text style={styles.policyDescription}>
+                        We are committed to protecting your privacy. Your personal data will not be shared with third parties without your explicit consent. We comply with international data protection regulations.
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.sectionTitle}>Questions & Support</Text>
+                  
+                  <View style={styles.supportInfoBox}>
+                    <Icon name="mail" size={20} color="#009966" />
+                    <View style={styles.supportInfoText}>
+                      <Text style={styles.supportLabel}>For inquiries, contact us at:</Text>
+                      <Text style={styles.supportValue}>nadil.dulran@akvasoft.com</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.copyButton}
+                      onPress={handleCopyEmail}
+                    >
+                      <Icon name={emailCopied ? 'check' : 'copy'} size={18} color={emailCopied ? '#009966' : '#6a7282'} />
+                      {emailCopied && <Text style={styles.copiedText}>Copied!</Text>}
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.disclaimerText}>
+                    By creating an account, you acknowledge that you have read and agree to our Terms of Service and Privacy Policy.
+                  </Text>
+                </View>
+              </ScrollView>
+
+              {/* Modal Footer */}
+              <TouchableOpacity
+                style={styles.modalPrimaryButton}
+                onPress={() => setShowTermsModal(false)}
+              >
+                <Text style={styles.modalButtonText}>I Understand & Agree</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
     </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
-  scroll: { padding: 24, flexGrow: 1 },
+  scroll: { padding: 24, flexGrow: 1, justifyContent: 'center'},
 
   header: { alignItems: 'center', marginBottom: 30 },
   logo: {
-    width: 60,
-    height: 60,
+    width: 65,
+    height: 65,
     backgroundColor: '#009966',
     borderRadius: 18,
     justifyContent: 'center',
@@ -324,7 +446,12 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
 
-  label: { fontSize: 13, color: '#000000', marginTop: 12 },
+  label: { 
+    fontSize: 13,
+    fontWeight: '500', 
+    color: '#676767', 
+    marginTop: 12 
+  },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -339,13 +466,34 @@ const styles = StyleSheet.create({
   error: { color: '#ff2056', fontSize: 12, marginTop: 4 },
   errorBorder: { borderColor: '#ff2056' },
 
-  terms: {
-    fontSize: 12,
+  /* Terms Container */
+  termsContainer: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  termsText: {
+    fontSize: 13,
     color: '#6a7282',
     textAlign: 'center',
-    marginTop: 16,
+    marginBottom: 10,
+    fontWeight: '500',
   },
-  link: { color: '#009966', fontWeight: '600' },
+  termsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FAF7',
+    borderWidth: 1.5,
+    borderColor: '#009966',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  termsLink: {
+    color: '#009966',
+    fontWeight: '600',
+    fontSize: 13,
+  },
 
   primaryButton: {
     backgroundColor: '#009966',
@@ -377,7 +525,7 @@ const styles = StyleSheet.create({
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
+    marginBottom: 25,
   },
   socialButton: {
     flexDirection: 'row',
@@ -401,5 +549,140 @@ const styles = StyleSheet.create({
   loginLink: { 
     color: '#009966', 
     fontWeight: '600' 
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 20,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+    position: 'relative',
+  },
+  documentIconCircle: {
+    width: 60,
+    height: 60,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#101828',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: -10,
+    right: 0,
+    padding: 8,
+  },
+  modalScroll: {
+    maxHeight: 350,
+    marginBottom: 16,
+  },
+  modalBody: {
+    paddingRight: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#101828',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+  policySection: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  policyText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  policyLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#101828',
+    marginBottom: 4,
+  },
+  policyDescription: {
+    fontSize: 13,
+    color: '#6a7282',
+    lineHeight: 18,
+  },
+  supportInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#009966',
+  },
+  supportInfoText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  supportLabel: {
+    fontSize: 12,
+    color: '#6a7282',
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  supportValue: {
+    fontSize: 15,
+    color: '#101828',
+    fontWeight: '600',
+  },
+  copyButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  copiedText: {
+    fontSize: 10,
+    color: '#009966',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  disclaimerText: {
+    fontSize: 12,
+    color: '#6a7282',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 16,
+  },
+  modalPrimaryButton: {
+    backgroundColor: '#009966',
+    borderRadius: 12,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
