@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,8 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  BackHandler,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
@@ -24,6 +25,22 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+
+  // Handle back button to exit app on login screen
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        BackHandler.exitApp();
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => {
+        backHandler.remove();
+      };
+    }, [])
+  );
 
   const handleLogin = async () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -84,8 +101,7 @@ export default function LoginScreen() {
   };
 
  const handleGoogleLogin = async () => {
-  // Navigate like success
-  navigation.navigate('MainTabs');
+  Alert.alert('Google Login coming soon...');
 };
 
 const handleFacebookLogin = () => {
@@ -94,88 +110,92 @@ const handleFacebookLogin = () => {
 
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.logo}>
-          <Image source={logoIcon} />
+    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+      <View style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.logo}>
+            <Image source={logoIcon} />
+          </View>
+          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.subtitle}>
+            Sign in to continue splitting expenses
+          </Text>
         </View>
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>
-          Sign in to continue splitting expenses
-        </Text>
-      </View>
 
-      {/* Form */}
-      <View style={styles.card}>
-        {/* Email */}
-        <Text style={styles.label}>Email Address</Text>
-        <View style={styles.inputWrapper}>
-           <Icon name="mail" size={18} color="#9CA3AF" />
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your email"
-            value={email}
-            onChangeText={(text) => {
-              setEmail(text);
-              setErrors({ ...errors, email: undefined });
-            }}
-          />
-        </View>
-        {errors.email && <Text style={styles.error}>{errors.email}</Text>}
+        {/* Form */}
+        <View style={styles.card}>
+          {/* Email */}
+          <Text style={styles.label}>Email Address</Text>
+          <View style={styles.inputWrapper}>
+            <Icon name="mail" size={18} color="#9CA3AF" />
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your email"
+              placeholderTextColor="#9CA3AF"
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                setErrors({ ...errors, email: undefined });
+              }}
+            />
+          </View>
+          {errors.email && <Text style={styles.error}>{errors.email}</Text>}
 
-        {/* Password */}
-        <Text style={[styles.label, { marginTop: 16 }]}>Password</Text>
-        <View style={styles.inputWrapper}>
-        <Icon name="lock" size={18} color="#9CA3AF" />
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your password"
-            secureTextEntry={!showPassword}
-            value={password}
-            onChangeText={(text) => {
-              setPassword(text);
-              setErrors({ ...errors, password: undefined });
-            }}
-          />
-          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-            <Icon name={showPassword ? 'eye' : 'eye-off'} size={18} color="#99A1AF" />
+          {/* Password */}
+          <Text style={[styles.label, { marginTop: 16 }]}>Password</Text>
+          <View style={styles.inputWrapper}>
+            <Icon name="lock" size={18} color="#9CA3AF" />
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your password"
+              placeholderTextColor="#9CA3AF"
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                setErrors({ ...errors, password: undefined });
+              }}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <Icon name={showPassword ? 'eye' : 'eye-off'} size={18} color="#99A1AF" />
+            </TouchableOpacity>
+          </View>
+          {errors.password && <Text style={styles.error}>{errors.password}</Text>}
+
+          {/* Forgot Password */}
+          <TouchableOpacity
+            style={styles.forgot}
+            onPress={() => navigation.navigate('ForgotPassword' as never)}
+          >
+            <Text style={styles.forgotText}>Forgot password?</Text>
           </TouchableOpacity>
-        </View>
-        {errors.password && <Text style={styles.error}>{errors.password}</Text>}
 
-        {/* Forgot Password */}
-        <TouchableOpacity
-          style={styles.forgot}
-          onPress={() => navigation.navigate('ForgotPassword' as never)}
-        >
-          <Text style={styles.forgotText}>Forgot password?</Text>
-        </TouchableOpacity>
+          {/* Login Button */}
+          <TouchableOpacity style={styles.button} onPress={handleLogin}>
+            <Text style={styles.buttonText}>Sign In</Text>
+          </TouchableOpacity>
 
-        {/* Login Button */}
-        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Sign In</Text>
-        </TouchableOpacity>
-
-           {/* Divider */}
-          <View style={styles.divider}>
+          {/* Divider */}
+          {/* <View style={styles.divider}>
             <View style={styles.line} />
             <Text style={styles.orText}>OR</Text>
             <View style={styles.line} />
-          </View>
+          </View> */}
 
-         {/* Google */}
-          <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
+          {/* Google */}
+          {/* <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
             <Image source={googleIcon} style={styles.socialIcon} />
             <Text style={styles.socialText}>Continue with Google</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           {/* Facebook */}
-          <TouchableOpacity style={styles.socialButton} onPress={handleFacebookLogin}>
+          {/* <TouchableOpacity style={styles.socialButton} onPress={handleFacebookLogin}>
             <Image source={facebookIcon} style={styles.socialIcon} />
             <Text style={styles.socialText}>Continue with Facebook</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
+      </View>
 
       {/* Sign Up */}
       <View style={styles.signupContainer}>
@@ -198,14 +218,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
     paddingHorizontal: 20,
   },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   header: {
     alignItems: 'center',
-    marginTop: 40,
     marginBottom: 30,
   },
   logo: {
-    width: 63.9,
-    height: 63.9,
+    width: 65,
+    height: 65,
     backgroundColor: '#009966',
     borderRadius: 16,
     justifyContent: 'center',
@@ -235,8 +258,9 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   label: {
-    fontSize: 12,
-    color: '#6A7282',
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#676767',
     marginBottom: 6,
   },
   inputWrapper: {
@@ -284,7 +308,7 @@ const styles = StyleSheet.create({
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 30,
+    marginBottom: 25,
   },
   signupText: {
     color: '#009966',
