@@ -1,4 +1,4 @@
-package com.roommateexpensetracker
+package io.akva.ret
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

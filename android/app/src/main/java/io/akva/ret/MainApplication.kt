@@ -1,4 +1,4 @@
-package com.roommateexpensetracker
+package io.akva.ret
 
 import android.app.Application
 import com.facebook.react.PackageList
