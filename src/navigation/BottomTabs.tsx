@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Dashboard from '../screens/main/Dashboard';
 import ProfileSettings from '../screens/profile/ProfileSettings';
 import ActivityScreen from '../screens/main/ActivityScreen';
@@ -13,14 +14,25 @@ import { BottomTabParamList } from '../types/navigation';
 const Tab = createBottomTabNavigator<BottomTabParamList>();
 
 const BottomTabs = () => {
+  const insets = useSafeAreaInsets();
+  const tabBarBottomInset = Math.max(insets.bottom, 8);
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
-        tabBarStyle: styles.tabBar,
-        tabBarItemStyle: {
-    flex: 1,},
+        sceneStyle: {
+          paddingTop: insets.top,
+        },
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 68 + tabBarBottomInset,
+            paddingBottom: tabBarBottomInset,
+          },
+        ],
+        tabBarItemStyle: styles.tabBarItem,
       }}
     >
       <Tab.Screen
@@ -131,12 +143,13 @@ const AddButton = ({ onPress }: any) => {
 
 const styles = StyleSheet.create({
   tabBar: {
-    height: 85,
-    paddingBottom: 10,
-    paddingTop: 10,
+    paddingTop: 8,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
+  },
+  tabBarItem: {
+    flex: 1,
   },
   tabItem: {
     alignItems: 'center',
@@ -148,17 +161,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '600',
   },
-  tabBarStyle: {
-  height: 70,
-  paddingBottom: 10,
-  paddingTop: 10,
-  backgroundColor: '#fff',
-  borderTopWidth: 1,
-  borderTopColor: '#E5E7EB',
-  position: 'absolute',
-},
 addButtonContainer: {
-  top: -30, 
+  top: -24,
   justifyContent: 'center',
   alignItems: 'center',
 },
