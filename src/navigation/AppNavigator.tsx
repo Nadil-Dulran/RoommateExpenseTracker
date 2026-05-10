@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import  Login  from "../screens/authentication/LoginScreen";
 import Signup  from "../screens/authentication/SignupScreen";
 import  ForgotPassword  from "../screens/authentication/ForgetPasswordScreen";
@@ -18,6 +19,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const AppNavigator = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Login');
+  const insets = useSafeAreaInsets();
 
     useEffect(() => {
       const checkToken = async () => {
@@ -45,7 +47,15 @@ const AppNavigator = () => {
 
     if (isLoading) {
       return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+          }}
+        >
           <ActivityIndicator size="large" color="#009966" />
         </View>
       );
@@ -55,16 +65,38 @@ const AppNavigator = () => {
       <NavigationContainer linking={linking}>
         <Stack.Navigator
           initialRouteName={initialRoute}
-          screenOptions={{ headerShown: false }}
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {
+              paddingTop: insets.top,
+              paddingBottom: insets.bottom,
+            },
+          }}
         >
           {/* Auth Screens */}
 
-          <Stack.Screen name="Login" component={Login} />
-          <Stack.Screen name="Signup" component={Signup} />
-          <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+          <Stack.Screen
+            name="Login"
+            component={Login}
+            options={{ contentStyle: { paddingTop: 0, paddingBottom: 0 } }}
+          />
+          <Stack.Screen
+            name="Signup"
+            component={Signup}
+            options={{ contentStyle: { paddingTop: 0, paddingBottom: 0 } }}
+          />
+          <Stack.Screen 
+           name="ForgotPassword" 
+           component={ForgotPassword} 
+           options={{ contentStyle: { paddingTop: 0, paddingBottom: 0 } }}
+          />
 
           {/* Main Screens */}
-          <Stack.Screen name="MainTabs" component={BottomTabs} />
+          <Stack.Screen
+            name="MainTabs"
+            component={BottomTabs}
+            options={{ contentStyle: { paddingTop: 0, paddingBottom: 0 } }}
+          />
 
           {/* External Screens */}
           <Stack.Screen name="SettleUp" component={SettleUpScreen} />
