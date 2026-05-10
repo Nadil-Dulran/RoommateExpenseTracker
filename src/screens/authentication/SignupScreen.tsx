@@ -309,7 +309,7 @@ export default function SignupScreen() {
    </ScrollView>
         {/* Login */}
         <View style={styles.bottomRow}>
-          <Text style={{ color: '#6a7282' }}>
+          <Text style={{ color: '#6a7282', fontSize: 15 }}>
             Already have an account?
           </Text>
           <TouchableOpacity
@@ -547,7 +547,8 @@ const styles = StyleSheet.create({
   marginRight: 10,
   },
   loginLink: { 
-    color: '#009966', 
+    color: '#009966',
+    fontSize:15, 
     fontWeight: '600' 
   },
   modalOverlay: {
