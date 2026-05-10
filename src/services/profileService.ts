@@ -148,4 +148,42 @@ export const profileService = {
     throw new Error('Profile update route/method not found');
   }
 
+  ,
+
+  async deleteAccount() {
+    const token = await getTokenOrThrow();
+    let lastError: Error | null = null;
+
+    for (const endpoint of PROFILE_ENDPOINTS) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const body = await parseJson(response);
+
+        if (response.ok) {
+          return true;
+        }
+
+        if (response.status === 404 || response.status === 405) {
+          continue;
+        }
+
+        lastError = new Error(formatErrorMessage(body, 'Failed to delete account', response));
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error('Failed to delete account');
+      }
+    }
+
+    if (lastError) {
+      throw lastError;
+    }
+
+    throw new Error('Profile delete route not found');
+  }
+
 };
