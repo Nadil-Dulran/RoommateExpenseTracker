@@ -28,6 +28,12 @@ const AVATAR_COMPRESSION_QUALITY = 0.5;
 const AVATAR_MAX_WIDTH = 720;
 const AVATAR_MAX_HEIGHT = 720;
 const MAX_AVATAR_BASE64_BYTES = 700 * 1024;
+const ACCOUNT_DELETE_CLEANUP_ITEMS = [
+  'Your account and profile data with notifications.',
+  'Data such as expenses, splits and settlements created by you.',
+  'Removal from existing groups and prevention of future group joins.',
+  'Groups created by this user and dependent data such as expenses, splits, settlements where there are multiple participants.',
+];
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
@@ -44,6 +50,8 @@ export default function ProfileScreen() {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [avatarMimeType, setAvatarMimeType] = useState('image/jpeg');
   const [avatarBase64Payload, setAvatarBase64Payload] = useState<string | undefined>(undefined);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setSelectedCurrency(currency);
@@ -166,6 +174,31 @@ export default function ProfileScreen() {
       navigation.navigate('Login');
     } catch (error) {
       Alert.alert('Sign out failed');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      setIsDeleting(true);
+
+      await profileService.deleteAccount();
+
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('userId');
+
+      navigation.navigate('Login');
+    } catch (error) {
+      console.log('Account delete failed', error);
+
+      if (error instanceof Error && error.message === 'No auth token found') {
+        Alert.alert('Session expired', 'Please login again.');
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Delete failed', error instanceof Error ? error.message : 'Unknown error');
+      }
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
     }
   };
 
@@ -374,6 +407,15 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
 
+        {/* Delete Account */}
+        <TouchableOpacity
+          style={[styles.deleteButton, isDeleting && styles.deleteButtonDisabled]}
+          onPress={() => setShowDeleteModal(true)}
+          disabled={isDeleting}
+        >
+          <Text style={styles.deleteButtonText}>Delete Account</Text>
+        </TouchableOpacity>
+
       {/* Version */}
       <View style={styles.versionContainer}>
         <Text style={styles.versionText}>Version 1.0.0</Text>
@@ -440,6 +482,74 @@ export default function ProfileScreen() {
             > 
               <Text style={{ color: '#6a7282' }}>Cancel</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModalContent}>
+            <View style={styles.deleteModalHeader}>
+              <View style={styles.deleteIconCircle}>
+                <Icon name="alert-triangle" size={24} color="#DC2626" />
+              </View>
+              <Text style={styles.deleteModalTitle}>Delete Account</Text>
+              <TouchableOpacity
+                style={styles.deleteCloseButton}
+                onPress={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+              >
+                <Icon name="x" size={22} color="#6a7282" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.deleteModalScroll} showsVerticalScrollIndicator={true}>
+              <View style={styles.deleteModalBody}>
+                <Text style={styles.deleteModalText}>
+                  This account delete performs a hard delete with cleanup. It is not a logout or soft delete.
+                </Text>
+
+                <Text style={styles.deleteSectionTitle}>The following data will be deleted</Text>
+                {ACCOUNT_DELETE_CLEANUP_ITEMS.map((item) => (
+                  <View key={item} style={styles.deleteListItem}>
+                    <Text style={styles.deleteListBullet}>-</Text>
+                    <Text style={styles.deleteListText}>{item}</Text>
+                  </View>
+                ))}
+
+                <Text style={styles.deleteWarningText}>
+                  This action is permanent and cannot be undone.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.dangerButtonsRow}>
+              <TouchableOpacity
+                style={styles.dangerCancelButton}
+                onPress={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+              >
+                <Text style={{ color: '#595e68', fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.dangerConfirmButton, isDeleting && styles.deleteButtonDisabled]}
+                onPress={handleDeleteAccount}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={{ color: '#fff', fontWeight: '600' }}>Confirm Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -713,4 +823,123 @@ checkWrapperModal: {
   justifyContent: 'center',
   alignItems: 'center',
 },
+  deleteButton: {
+    backgroundColor: '#FEEAEA',
+    marginHorizontal: 20,
+    padding: 17,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+    elevation: 1,
+  },
+  deleteButtonDisabled: {
+    opacity: 0.6,
+  },
+  deleteButtonText: {
+    color: '#ff2056',
+    fontWeight: '700',
+  },
+  deleteModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 20,
+    maxHeight: '90%',
+  },
+  deleteModalHeader: {
+    alignItems: 'center',
+    marginBottom: 18,
+    position: 'relative',
+  },
+  deleteIconCircle: {
+    width: 60,
+    height: 60,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  deleteModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+  },
+  deleteCloseButton: {
+    position: 'absolute',
+    top: -10,
+    right: 0,
+    padding: 8,
+  },
+  deleteModalScroll: {
+    maxHeight: 330,
+    marginBottom: 16,
+  },
+  deleteModalBody: {
+    paddingRight: 8,
+  },
+  deleteModalText: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+    marginBottom: 14,
+    textAlign: 'center'
+  },
+  deleteSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#101828',
+    marginBottom: 12,
+  },
+  deleteListItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  deleteListBullet: {
+    color: '#DC2626',
+    fontSize: 14,
+    marginRight: 8,
+    marginTop: 2,
+    fontWeight: '700',
+  },
+  deleteListText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
+  deleteWarningText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#B91C1C',
+    fontWeight: '600',
+  },
+  dangerButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  dangerCancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 1,
+  },
+  dangerConfirmButton: {
+    flex: 1,
+    backgroundColor: '#DC2626',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 1,
+  },
 });
