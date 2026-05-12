@@ -198,14 +198,7 @@ export default function ForgotPasswordScreen() {
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.goToSignInButton}
-                onPress={() => navigation.navigate('Login')}
-              >
-                <Text style={styles.goToSignInText}>
-                  Go to <Text style={styles.goToSignInAccent}>Sign In</Text>
-                </Text>
-              </TouchableOpacity>
+              
             </>
           )}
 
@@ -313,15 +306,27 @@ export default function ForgotPasswordScreen() {
             </>
           )}
           </View>
-      </View>
 
-        {/* Help */}
+          {/* Help */}
         <View style={styles.helpContainer}>
-          <Text style={{ color: '#6a7282' }}>Need help? </Text>
+          <Text style={{ color: '#6a7282', fontSize: 13 }}>
+            Need help? 
+          </Text>
           <TouchableOpacity onPress={() => setShowContactSupportModal(true)}>
-            <Text style={styles.contactLink}>Contact Support</Text>
+            <Text style={styles.contactLink}> Contact Support</Text>
           </TouchableOpacity>
         </View>
+
+      </View>
+
+        <TouchableOpacity
+            style={styles.goToSignInButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={{ color: '#6a7282', fontSize: 15, marginBottom: 25 }}>
+              Go back to <Text style={styles.goToSignInAccent}>Sign In</Text>
+            </Text>
+          </TouchableOpacity>
 
         {/* Contact Support Modal */}
         <Modal
@@ -515,11 +520,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 20,
     paddingBottom: 1,
-    marginBottom: 25,
+    marginTop: 10,
   },
   contactLink: {
     color: '#009966',
     fontWeight: '500',
+    fontSize: 13,
   },
   successTitle: {
   fontSize: 22,
@@ -530,11 +536,6 @@ const styles = StyleSheet.create({
 },
   goToSignInButton: {
     alignSelf: 'center',
-    marginTop: 14,
-  },
-  goToSignInText: {
-    color: '#6a7282',
-    fontWeight: '400',
   },
   goToSignInAccent: {
     color: '#009966',
