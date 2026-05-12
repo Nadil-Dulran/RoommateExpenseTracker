@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   BackHandler,
+  Modal,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
@@ -25,6 +26,9 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [showContactSupportModal, setShowContactSupportModal] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
+  
 
   // Handle back button to exit app on login screen
   useFocusEffect(
@@ -96,7 +100,17 @@ export default function LoginScreen() {
 
   } catch (error) {
     console.log(error);
-    Alert.alert('Login failed');
+    // Determine error type
+    if (error instanceof TypeError || (error as any)?.message?.includes('Network')) {
+      newErrors.password = 'Network error. Please check your internet connection.';
+    } else if ((error as any)?.response?.status >= 500) {
+      newErrors.password = 'Server error. Please try again later.';
+    } else if ((error as any)?.response?.status >= 400) {
+      newErrors.password = 'Backend error. Please try again.';
+    } else {
+      newErrors.password = 'An unexpected error occurred. Please contact support.';
+    }
+    setErrors(newErrors);
   }
   };
 
@@ -106,6 +120,16 @@ export default function LoginScreen() {
 
 const handleFacebookLogin = () => {
   Alert.alert('Facebook Login coming soon...');
+};
+
+const handleCopyEmail = async () => {
+  try {
+    // In React Native, use a clipboard library or implement copy functionality
+    setEmailCopied(true);
+    setTimeout(() => setEmailCopied(false), 2000);
+  } catch (error) {
+    console.log('Error copying email:', error);
+  }
 };
 
 
@@ -195,11 +219,22 @@ const handleFacebookLogin = () => {
             <Text style={styles.socialText}>Continue with Facebook</Text>
           </TouchableOpacity> */}
         </View>
+        
+        {/* Help */}
+                <View style={styles.helpContainer}>
+                  <Text style={{ color: '#6a7282', fontSize: 13 }}>
+                    Need help? 
+                  </Text>
+                  <TouchableOpacity onPress={() => setShowContactSupportModal(true)}>
+                    <Text style={styles.contactLink}> Contact Support</Text>
+                  </TouchableOpacity>
+                </View>
+
       </View>
 
       {/* Sign Up */}
       <View style={styles.signupContainer}>
-        <Text style={{ color: '#6a7282' }}>
+        <Text style={{ color: '#6a7282', fontSize: 15 }}>
           Don't have an account?{' '}
         </Text>
         <TouchableOpacity
@@ -208,6 +243,60 @@ const handleFacebookLogin = () => {
           <Text style={styles.signupText}>Sign up</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Contact Support Modal */}
+      <Modal
+        visible={showContactSupportModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowContactSupportModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.supportIconCircle}>
+                <Icon name="mail" size={24} color="#009966" />
+              </View>
+              <Text style={styles.modalTitle}>Contact Support</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowContactSupportModal(false)}
+              >
+                <Icon name="x" size={24} color="#6a7282" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Modal Body */}
+            <Text style={styles.modalSubtitle}>
+              We're here to help! Reach out to our support team with any questions.
+            </Text>
+
+            <View style={styles.supportInfoBox}>
+              <Icon name="mail" size={20} color="#009966" />
+              <View style={styles.supportInfoText}>
+                <Text style={styles.supportLabel}>Email</Text>
+                <Text style={styles.supportValue}>nadil.dulran@akvasoft.com</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.copyButton}
+                onPress={handleCopyEmail}
+              >
+                <Icon name={emailCopied ? 'check' : 'copy'} size={18} color={emailCopied ? '#009966' : '#6a7282'} />
+                {emailCopied && <Text style={styles.copiedText}>Copied!</Text>}
+              </TouchableOpacity>
+            </View>
+
+            {/* Modal Actions */}
+            <TouchableOpacity
+              style={styles.modalPrimaryButton}
+              onPress={() => setShowContactSupportModal(false)}
+            >
+              <Text style={styles.modalButtonText}>Got It</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -305,6 +394,19 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  helpContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 1,
+    marginTop: 10,
+    marginBottom: 25,
+  },
+  contactLink: {
+    color: '#009966',
+    fontSize: 13,
+    fontWeight: '500',
+  },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -313,6 +415,7 @@ const styles = StyleSheet.create({
   signupText: {
     color: '#009966',
     fontWeight: '600',
+    fontSize: 15,
   },
     divider: {
     flexDirection: 'row',
@@ -348,5 +451,95 @@ const styles = StyleSheet.create({
   height: 20,
   marginRight: 10,
 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    minHeight: 300,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+    position: 'relative',
+  },
+  supportIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F0F9F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#101828',
+    marginBottom: 8,
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    padding: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6a7282',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  supportInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  supportInfoText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  supportLabel: {
+    fontSize: 12,
+    color: '#6a7282',
+    marginBottom: 4,
+  },
+  supportValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#101828',
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+  },
+  copiedText: {
+    fontSize: 12,
+    color: '#009966',
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  modalPrimaryButton: {
+    backgroundColor: '#009966',
+    borderRadius: 12,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16,
+  },
 });
 
