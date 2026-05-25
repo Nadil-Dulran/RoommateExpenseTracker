@@ -7,12 +7,12 @@ export interface Currency {
 }
 
 export const currencies: Currency[] = [
+  { code: 'LKR', symbol: 'Rs.', name: 'Sri Lankan Rupee' },
   { code: 'USD', symbol: '$', name: 'US Dollar' },
   { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
-  { code: 'LKR', symbol: 'Rs.', name: 'Sri Lankan Rupee' },
 ];
 
-export const DEFAULT_CURRENCY_CODE: CurrencyCode = 'USD';
+export const DEFAULT_CURRENCY_CODE: CurrencyCode = 'LKR';
 
 export const isSupportedCurrencyCode = (value?: string | null): value is CurrencyCode => {
   return currencies.some(function (c) {
