@@ -12,7 +12,8 @@ export const authService = {
       body: JSON.stringify(data),
     });
 
-    return response.json();
+    const body = await response.json().catch(() => ({}));
+    return { status: response.status, ok: response.ok, body };
   },
 
   login: async (data: any) => {
