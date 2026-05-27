@@ -38,6 +38,7 @@ type DashboardGroup = {
   id: string;
   name: string;
   emoji?: string;
+  updatedAt?: string | null;
   balance?: {
     amount: number;
     isYouOwing: boolean;
@@ -79,6 +80,15 @@ const toSafeString = (value: any, fallback = '') => {
 
   const parsed = String(value).trim();
   return parsed || fallback;
+};
+
+const toTimestamp = (value: any) => {
+  if (!value) {
+    return 0;
+  }
+
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : 0;
 };
 
 const getExpenseEmoji = (expense: any) => {
@@ -159,6 +169,8 @@ const normalizeDashboardData = (raw: any): DashboardData => {
       id: toSafeString(group?.id),
       name: toSafeString(group?.name, 'Untitled Group'),
       emoji: toSafeString(group?.emoji, '👥'),
+      updatedAt:
+        group?.updatedAt ?? group?.updated_at ?? group?.modifiedAt ?? group?.modified_at ?? group?.createdAt ?? group?.created_at ?? null,
       balance: {
         amount: toSafeNumber(group?.balance?.amount),
         isYouOwing: Boolean(group?.balance?.isYouOwing),
@@ -166,6 +178,10 @@ const normalizeDashboardData = (raw: any): DashboardData => {
     })),
     recentExpenses: recentExpenses.map(normalizeRecentExpense),
   };
+};
+
+const normalizeGroupTimestamp = (group: any) => {
+  return group?.updatedAt ?? group?.updated_at ?? group?.modifiedAt ?? group?.modified_at ?? group?.createdAt ?? group?.created_at ?? null;
 };
 
 type DashboardNavigationProp = CompositeNavigationProp<
@@ -263,6 +279,31 @@ export default function DashboardScreen() {
     }
   }, []);
 
+  const [groupMetadata, setGroupMetadata] = useState<Array<{ id: string; updatedAt: string | null }>>([]);
+
+  const loadGroupMetadata = useCallback(async () => {
+    try {
+      const groupsResponse = await groupsService.getGroups();
+      const groupList: any[] = Array.isArray(groupsResponse)
+        ? groupsResponse
+        : Array.isArray(groupsResponse?.data)
+        ? groupsResponse.data
+        : Array.isArray(groupsResponse?.groups)
+        ? groupsResponse.groups
+        : [];
+
+      setGroupMetadata(
+        groupList.map((group: any) => ({
+          id: toSafeString(group?.id),
+          updatedAt: normalizeGroupTimestamp(group),
+        }))
+      );
+    } catch (error) {
+      console.log('Failed to load group metadata for dashboard', error);
+      setGroupMetadata([]);
+    }
+  }, []);
+
   const loadDashboard = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -283,8 +324,9 @@ export default function DashboardScreen() {
       loadCurrentUserId(),
       loadDashboard(),
       loadSettlements(),
+      loadGroupMetadata(),
     ]);
-  }, [loadCurrentUserId, loadDashboard, loadSettlements]);
+  }, [loadCurrentUserId, loadDashboard, loadSettlements, loadGroupMetadata]);
 
   useEffect(() => {
     void loadAllDashboardData();
@@ -341,16 +383,17 @@ export default function DashboardScreen() {
 
   const recentExpenses = dashboard?.recentExpenses ?? [];
   const baseGroups = useMemo(() => {
-    return dashboard?.groups ?? [];
-  }, [dashboard?.groups]);
+    const metadataById = new Map(groupMetadata.map(group => [group.id, group.updatedAt]));
+
+    return (dashboard?.groups ?? []).map(group => ({
+      ...group,
+      updatedAt: group.updatedAt ?? metadataById.get(String(group.id || '')) ?? null,
+    }));
+  }, [dashboard?.groups, groupMetadata]);
 
   const groups = useMemo(() => {
     const me = String(currentUserId || '');
-    if (!me) {
-      return baseGroups;
-    }
-
-    return baseGroups.map(group => {
+    const adjustedGroups = baseGroups.map(group => {
       const groupId = String(group.id || '');
       const groupSettlements = settlements.filter(
         s => String(s.groupId || '') === groupId
@@ -360,28 +403,37 @@ export default function DashboardScreen() {
         return group;
       }
 
-      let adjustedAmount = group.balance?.amount ?? 0;
-      const isYouOwing = group.balance?.isYouOwing ?? false;
+      const baseBalance = group.balance ?? { amount: 0, isYouOwing: false };
+      let signedBalance = baseBalance.isYouOwing
+        ? -Number(baseBalance.amount || 0)
+        : Number(baseBalance.amount || 0);
 
       groupSettlements.forEach(settlement => {
         const payerId = String(settlement.payerId || '');
         const receiverId = String(settlement.receiverId || '');
         const amount = Number(settlement.amount || 0);
 
-        if (isYouOwing && payerId === me && receiverId) {
-          adjustedAmount -= amount;
-        } else if (!isYouOwing && receiverId === me && payerId) {
-          adjustedAmount -= amount;
+        if (payerId === me && receiverId) {
+          signedBalance += amount;
+        } else if (receiverId === me && payerId) {
+          signedBalance -= amount;
         }
       });
 
       return {
         ...group,
         balance: {
-          amount: Math.max(0, adjustedAmount),
-          isYouOwing: group.balance?.isYouOwing ?? false,
+          amount: Math.abs(signedBalance),
+          isYouOwing: signedBalance < 0,
         },
       };
+    });
+
+    return [...adjustedGroups].sort((left, right) => {
+      const rightTimestamp = toTimestamp(right.updatedAt);
+      const leftTimestamp = toTimestamp(left.updatedAt);
+
+      return rightTimestamp - leftTimestamp;
     });
   }, [baseGroups, settlements, currentUserId]);
 
