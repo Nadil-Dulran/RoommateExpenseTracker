@@ -18,6 +18,7 @@ import googleIcon from '../../../assets/google.png';
 import facebookIcon from '../../../assets/facebook.png';
 import logoIcon from '../../../assets/Logo.png';
 import { authService } from '../../services/authService';
+import { DEFAULT_CURRENCY_CODE } from '../../constants/currencies';
 
 
 
@@ -96,16 +97,26 @@ export default function SignupScreen() {
       email: formData.email,
       phone: formData.phone,
       password: formData.password,
+      currency: DEFAULT_CURRENCY_CODE,
     });
 
-    if (result.message === 'User created successfully') {
+    const responseMessage = result?.body?.message || '';
+    const isDuplicateEmail =
+      result?.status === 409 ||
+      /already exist/i.test(responseMessage) ||
+      /email.*exist/i.test(responseMessage);
+
+    if (result?.ok || responseMessage === 'User created successfully') {
       setStatusMessage('Account created successfully. Please sign in.');
       setStatusType('success');
       setTimeout(() => {
         navigation.navigate('Login');
       }, 1200);
+    } else if (isDuplicateEmail) {
+      setErrors({ email: 'Email already exists, try another one or Sign In' });
+      setStatusType('error');
     } else {
-      setStatusMessage(result.message || 'Signup failed');
+      setStatusMessage(responseMessage || 'Signup failed');
       setStatusType('error');
     }
 
