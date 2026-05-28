@@ -82,6 +82,15 @@ export default function GroupsScreen() {
     return typeof avatar === 'string' ? { uri: avatar } : avatar;
   };
 
+  const toTimestamp = (value: any) => {
+    if (!value) {
+      return 0;
+    }
+
+    const parsed = Date.parse(String(value));
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   const normalizeMembers = useCallback((membersRaw: any[]) => {
     return (membersRaw || []).map((member: any, index: number) => {
       return {
@@ -134,6 +143,7 @@ export default function GroupsScreen() {
       members,
       isYouOwing: group.balance?.isYouOwing ?? false,
       amount: group.balance?.amount ?? 0,
+      updatedAt: group.updatedAt ?? group.updated_at ?? group.modifiedAt ?? group.modified_at ?? group.createdAt ?? group.created_at ?? null,
     };
   }, [normalizeMembers]);
 
@@ -173,8 +183,19 @@ export default function GroupsScreen() {
         })
       );
 
-      setGroups(groupsWithMembers);
-      return groupsWithMembers;
+      const sortedGroups = [...groupsWithMembers].sort((left, right) => {
+        const rightTimestamp = toTimestamp(
+          right?.updatedAt ?? right?.updated_at ?? right?.modifiedAt ?? right?.modified_at ?? right?.createdAt ?? right?.created_at
+        );
+        const leftTimestamp = toTimestamp(
+          left?.updatedAt ?? left?.updated_at ?? left?.modifiedAt ?? left?.modified_at ?? left?.createdAt ?? left?.created_at
+        );
+
+        return rightTimestamp - leftTimestamp;
+      });
+
+      setGroups(sortedGroups);
+      return sortedGroups;
 
     } catch (error) {
 
