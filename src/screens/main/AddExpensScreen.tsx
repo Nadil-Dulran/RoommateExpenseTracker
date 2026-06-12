@@ -331,6 +331,8 @@ export default function AddExpenseScreen() {
                 {cat.icon}
               </Text>
               <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
                 style={[
                   styles.categoryText,
                   selectedCategory === key && {
