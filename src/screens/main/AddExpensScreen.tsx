@@ -187,6 +187,7 @@ export default function AddExpenseScreen() {
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryType | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<any | null>(null);
+  const [showGroupList, setShowGroupList] = useState(false);
   const [paidBy, setPaidBy] = useState<any | null>(null);
   const [splitType, setSplitType] =
     useState<'equal' | 'exact' | 'percentage' | null>(null);
@@ -229,11 +230,20 @@ export default function AddExpenseScreen() {
     ).toFixed(2);
   };
 
+  const formatLocalDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  };
+
   const resetFormInputs = useCallback(() => {
     setAmount('');
     setDescription('');
     setSelectedCategory(null);
     setSelectedGroup(null);
+    setShowGroupList(false);
     setPaidBy(null);
     setSplitType(null);
     setSelectedDate(new Date());
@@ -348,37 +358,79 @@ export default function AddExpenseScreen() {
 
         {/* Group */}
         <Text style={styles.label}>Group</Text>
-        {loadingGroups ? (
-          <ActivityIndicator color="#009966" style={{ marginVertical: 12 }} />
-        ) : backendGroups.length === 0 ? (
-          <Text style={{ color: '#98A2B3', marginBottom: 8 }}>No groups found</Text>
-        ) : (
-          backendGroups.map(group => (
-            <TouchableOpacity
-              key={group.id}
-              onPress={() => {
-                setSelectedGroup(group);
-                setPaidBy(null);
-              }}
-              style={[
-                styles.groupCard,
-                selectedGroup?.id === group.id &&
-                  styles.selectedGroupCard,
-              ]}
-            >
-              <Text style={styles.groupEmoji}>
-                {group.emoji}
+        <TouchableOpacity
+          onPress={() => setShowGroupList(prev => !prev)}
+          style={styles.groupSelector}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <View style={styles.groupSelectorAvatar}>
+              {selectedGroup ? selectedGroup?.avatarUri ? (
+                <Image
+                  source={{ uri: selectedGroup.avatarUri }}
+                  style={styles.groupSelectorAvatarImage}
+                />
+              ) : (
+                <Text style={styles.groupSelectorEmoji}>
+                  {selectedGroup?.emoji ?? '👥'}
+                </Text>
+              ) : (
+                <Icon name="users" size={20} color="#6A7282" />
+              )}
+            </View>
+
+            <View style={{ marginLeft: 10, flex: 1 }}>
+              <Text style={styles.groupSelectorTitle}>
+                {selectedGroup ? selectedGroup.name : 'Choose a group'}
               </Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.groupName}>
-                  {group.name}
+              <Text style={styles.groupSelectorSubtitle}>
+                {selectedGroup
+                  ? `${selectedGroup.members.length} members selected`
+                  : 'Tap to show your groups'}
+              </Text>
+            </View>
+          </View>
+
+          <Icon
+            name={showGroupList ? 'chevron-up' : 'chevron-down'}
+            size={20}
+            color="#6A7282"
+          />
+        </TouchableOpacity>
+
+        {showGroupList && (
+          loadingGroups ? (
+            <ActivityIndicator color="#009966" style={{ marginVertical: 12 }} />
+          ) : backendGroups.length === 0 ? (
+            <Text style={{ color: '#98A2B3', marginBottom: 8 }}>No groups found</Text>
+          ) : (
+            backendGroups.map(group => (
+              <TouchableOpacity
+                key={group.id}
+                onPress={() => {
+                  setSelectedGroup(group);
+                  setPaidBy(null);
+                  setShowGroupList(false);
+                }}
+                style={[
+                  styles.groupCard,
+                  selectedGroup?.id === group.id &&
+                    styles.selectedGroupCard,
+                ]}
+              >
+                <Text style={styles.groupEmoji}>
+                  {group.emoji}
                 </Text>
-                <Text style={styles.groupMembers}>
-                  {group.members.length} members
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.groupName}>
+                    {group.name}
+                  </Text>
+                  <Text style={styles.groupMembers}>
+                    {group.members.length} members
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          )
         )}
         
         {/* Select Date */}
@@ -390,7 +442,7 @@ export default function AddExpenseScreen() {
   <View style={styles.dateLeft}>
     <Icon name="calendar" size={20} color="#6A7282" />
     <Text style={styles.dateText}>
-      {selectedDate.toISOString().split('T')[0]}
+      {formatLocalDate(selectedDate)}
     </Text>
   </View>
 
@@ -621,7 +673,7 @@ export default function AddExpenseScreen() {
                 category: categories[selectedCategory].name,
                 groupId: parseInt(selectedGroup.id, 10),
                 paidById: paidBy.id,
-                date: selectedDate.toISOString().split('T')[0],
+                date: formatLocalDate(selectedDate),
                 splitType,
                 splits,
               });
@@ -734,6 +786,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 6,
     color: '#6A7282',
+    textAlign: 'center',
   },
 
   groupCard: {
@@ -745,6 +798,48 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     backgroundColor: '#fff',
+  },
+
+  groupSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: '#fff',
+    marginBottom: 8,
+  },
+
+  groupSelectorTitle: {
+    fontWeight: '600',
+    color: '#101828',
+  },
+
+  groupSelectorSubtitle: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#6A7282',
+  },
+
+  groupSelectorAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  groupSelectorAvatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+
+  groupSelectorEmoji: {
+    fontSize: 20,
   },
 
   selectedGroupCard: {
