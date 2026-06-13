@@ -13,7 +13,6 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BottomTabParamList, RootStackParamList } from '../../types/navigation';
-import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { Image } from 'react-native';
@@ -484,18 +483,18 @@ export default function DashboardScreen() {
         </View>
 
         {/* Balance Card */}
-        <LinearGradient
-          colors={['#101828', '#1e2939']}
-          style={styles.balanceCard}
-        >
+        <View
+         style= { styles.balanceCard }
+         >
           <View style={styles.balanceHeader}>
             <Icon name="credit-card" size={16} color="#99A1AF" />
             <Text style={styles.balanceLabel}>Total Balance</Text>
           </View>
 
-          <Text style={styles.balanceAmount}>
-            {formatCurrency(summary.totalBalance, { signed: true })}
-          </Text>
+        <Text
+          style={styles.balanceAmount} >
+          {formatCurrency(summary.totalBalance, { signed: true })}
+        </Text>
 
           <View style={styles.balanceRow}>
             <View style={styles.subCard}>
@@ -512,7 +511,7 @@ export default function DashboardScreen() {
               </Text>
             </View>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* Settle Button */}
         <TouchableOpacity
@@ -699,6 +698,7 @@ const styles = StyleSheet.create({
   },
 
   balanceCard: {
+    backgroundColor: '#101828',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -720,18 +720,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginVertical: 10,
+    marginBottom: 10,
   },
 
   balanceRow: {
     flexDirection: 'row',
-    gap: 10,
+    justifyContent: 'space-between',
+    marginTop: 8,
   },
 
   subCard: {
-    flex: 1,
+    flex: 0.48,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderRadius: 14,
+    minHeight: 70,
   },
 
   owedLabel: { color: '#009966', fontSize: 12 },
