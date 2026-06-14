@@ -473,7 +473,7 @@ export default function DashboardScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            <TouchableOpacity onPress={() => navigation.navigate('ProfileSettings')}>
               <Image
                 source={avatarSource}
                 style={styles.avatar}
