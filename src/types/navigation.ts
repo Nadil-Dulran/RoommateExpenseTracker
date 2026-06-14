@@ -36,6 +36,7 @@ export type RootStackParamList = {
       };
 
   Notifications: undefined;
+  ProfileSettings: undefined;
   GroupDetails: { id: string; group?: any };
   JoinGroup:
     | {
@@ -47,7 +48,6 @@ export type RootStackParamList = {
 
 export type BottomTabParamList = {
   Home: undefined;
-  Profile: undefined;
   Activity: undefined;
   Add: undefined;
   Groups: undefined;
