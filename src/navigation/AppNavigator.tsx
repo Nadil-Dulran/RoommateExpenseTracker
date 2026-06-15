@@ -12,6 +12,7 @@ import NotificationScreen from '../screens/external/NotificationScreen';
 import { RootStackParamList } from '../types/navigation';
 import GroupDetailsScreen from '../screens/external/GroupDetailsScreen';
 import JoinGroupScreen from '../screens/external/JoinGroupScreen';
+import ProfileSettings from '../screens/profile/ProfileSettings';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -101,6 +102,7 @@ const AppNavigator = () => {
           {/* External Screens */}
           <Stack.Screen name="SettleUp" component={SettleUpScreen} />
           <Stack.Screen name="Notifications" component={NotificationScreen} />
+          <Stack.Screen name="ProfileSettings" component={ProfileSettings} />
           <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
           <Stack.Screen name="JoinGroup" component={JoinGroupScreen} />
         </Stack.Navigator>
