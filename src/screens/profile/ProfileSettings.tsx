@@ -295,7 +295,14 @@ export default function ProfileScreen() {
         
          {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <View style={styles.headerContent}>
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <Icon name="chevron-left" size={26} color="#6a7282" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Profile</Text>
+          </View>
+          
+         
         </View>
 
         {/* Profile Image */}
@@ -829,11 +836,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
    header: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     backgroundColor: '#fff',
+    
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
   },
   headerTitle: {
     fontSize: 24,
+    marginLeft: 12,
     fontWeight: 'bold',
     color: '#101828',
   },
