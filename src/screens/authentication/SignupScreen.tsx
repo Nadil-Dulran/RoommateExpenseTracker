@@ -225,7 +225,7 @@ export default function SignupScreen() {
               <Icon
                 name={showPassword ? 'eye' : 'eye-off'}
                 size={18}
-                color="#9CA3AF"
+                color="#99A1AF"
               />
             </TouchableOpacity>
           </View>
@@ -251,7 +251,7 @@ export default function SignupScreen() {
               <Icon
                 name={showConfirmPassword ? 'eye' : 'eye-off'}
                 size={18}
-                color="#9CA3AF"
+                color="#99A1AF"
               />
             </TouchableOpacity>
           </View>
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
     height: 50,
     marginTop: 6,
   },
-  input: { flex: 1, marginLeft: 8 },
+  input: { flex: 1, marginLeft: 8, fontSize: 14, color: '#101828' },
   error: { color: '#ff2056', fontSize: 12, marginTop: 4 },
   errorBorder: { borderColor: '#ff2056' },
 
