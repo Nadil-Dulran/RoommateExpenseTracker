@@ -27,7 +27,7 @@ const BottomTabs = () => {
         tabBarStyle: [
           styles.tabBar,
           {
-            height: 60 + insets.bottom,
+            height: 63 + insets.bottom,
             paddingBottom: insets.bottom > 0 ? 8 : 6, 
           },
         ],
@@ -120,7 +120,7 @@ const AddButton = ({ onPress }: any) => {
       style={styles.addButtonContainer}
     >
       <View style={styles.addButton}>
-        <Icon name="plus" size={26} color="#FFFFFF" />
+        <Icon name="plus" size={30} color="#FFFFFF" />
       </View>
 
        <Text style={styles.addLabel}>
