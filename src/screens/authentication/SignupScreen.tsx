@@ -20,8 +20,6 @@ import logoIcon from '../../../assets/Logo.png';
 import { authService } from '../../services/authService';
 import { DEFAULT_CURRENCY_CODE } from '../../constants/currencies';
 
-
-
 export default function SignupScreen() {
   const navigation = useNavigation<any>();
 
@@ -138,8 +136,7 @@ export default function SignupScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-
+      <ScrollView contentContainerStyle={[ styles.scroll, { flexGrow: 1, justifyContent: 'center' } ]} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logo}>
@@ -433,6 +430,7 @@ export default function SignupScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   scroll: { padding: 24, flexGrow: 1, justifyContent: 'center'},
