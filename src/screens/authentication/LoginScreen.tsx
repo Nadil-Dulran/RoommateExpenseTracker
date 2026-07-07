@@ -18,6 +18,7 @@ import googleIcon from '../../../assets/google.png';
 import facebookIcon from '../../../assets/facebook.png';
 import { authService } from '../../services/authService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Keyboard, TouchableWithoutFeedback } from 'react-native';
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
@@ -134,6 +135,8 @@ const handleCopyEmail = async () => {
 
 
   return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={{ flex: 1 }}>
     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <View style={styles.content}>
         {/* Header */}
@@ -298,6 +301,8 @@ const handleCopyEmail = async () => {
         </View>
       </Modal>
     </SafeAreaView>
+    </View>
+    </TouchableWithoutFeedback>
   );
 }
 
