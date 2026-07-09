@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   forgot: {
-    alignItems: 'flex-end',
+    alignSelf: 'flex-end',
     marginTop: 10,
   },
   forgotText: {
