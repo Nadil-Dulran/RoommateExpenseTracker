@@ -16,6 +16,7 @@ import { Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import logoIcon from '../../../assets/Logo.png';
 import { authService } from '../../services/authService';
+import { Keyboard, TouchableWithoutFeedback } from 'react-native';
 
 export default function ForgotPasswordScreen() {
   const navigation = useNavigation<any>();
@@ -147,7 +148,9 @@ export default function ForgotPasswordScreen() {
 
   // FORM STATE
   return (
-    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+   <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+    <View style={{ flex: 1 }}>
+     <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
       <View style={styles.pageContent}>
           {/* Header */}
           <View style={styles.header}>
@@ -183,7 +186,6 @@ export default function ForgotPasswordScreen() {
                     setEmail(text);
                     setError('');
                   }}
-                  autoFocus
                 />
               </View>
 
@@ -228,7 +230,6 @@ export default function ForgotPasswordScreen() {
                   }}
                   keyboardType="numeric"
                   maxLength={6}
-                  autoFocus
                 />
               </View>
 
@@ -382,7 +383,9 @@ export default function ForgotPasswordScreen() {
           </View>
         </Modal>
       
-    </SafeAreaView>
+     </SafeAreaView>
+    </View>
+   </TouchableWithoutFeedback>
   );
 }
 const styles = StyleSheet.create({
