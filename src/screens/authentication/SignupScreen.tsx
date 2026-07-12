@@ -105,11 +105,16 @@ export default function SignupScreen() {
       /email.*exist/i.test(responseMessage);
 
     if (result?.ok || responseMessage === 'User created successfully') {
-      setStatusMessage('Account created successfully. Please sign in.');
-      setStatusType('success');
-      setTimeout(() => {
-        navigation.navigate('Login');
-      }, 1200);
+   Alert.alert(
+    'Success',
+    'Your account has been created successfully. Sign in to continue.',
+    [
+      {
+        text: 'OK',
+        onPress: () => navigation.navigate('Login'),
+      },
+     ],
+    );
     } else if (isDuplicateEmail) {
       setErrors({ email: 'Email already exists, try another one or Sign In' });
       setStatusType('error');
@@ -181,6 +186,8 @@ export default function SignupScreen() {
               placeholderTextColor="#9CA3AF"
               value={formData.email}
               onChangeText={(text) => handleChange('email', text)}
+              textContentType="emailAddress"
+              autoComplete="email"
             />
           </View>
           {errors.email && <Text style={styles.error}>{errors.email}</Text>}
@@ -215,7 +222,7 @@ export default function SignupScreen() {
               placeholderTextColor="#9CA3AF"
               secureTextEntry={!showPassword}
               value={formData.password}
-              onChangeText={(text) => handleChange('password', text)}
+              onChangeText={(text) => handleChange('password', text)}   
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}>
@@ -237,7 +244,7 @@ export default function SignupScreen() {
             <Icon name="lock" size={18} color="#9CA3AF" />
             <TextInput
               style={styles.input}
-              placeholder='Re enter the password'
+              placeholder='Re-enter the password'
               placeholderTextColor="#9CA3AF"
               secureTextEntry={!showConfirmPassword}
               value={formData.confirmPassword}
@@ -477,7 +484,7 @@ const styles = StyleSheet.create({
 
   /* Terms Container */
   termsContainer: {
-    marginTop: 16,
+    marginTop: 26,
     alignItems: 'center',
   },
   termsText: {
@@ -497,6 +504,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 14,
+    marginBottom: 26,
   },
   termsLink: {
     color: '#009966',
@@ -510,7 +518,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 16,
+    marginBottom: 40,
   },
   primaryButtonText: { color: '#fff', fontWeight: '600' },
   statusMessage: {
