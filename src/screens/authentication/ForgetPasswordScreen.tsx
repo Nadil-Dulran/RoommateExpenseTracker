@@ -5,8 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
-  Alert,
   Modal,
   Clipboard,
 } from 'react-native';
@@ -388,6 +386,7 @@ export default function ForgotPasswordScreen() {
    </TouchableWithoutFeedback>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
