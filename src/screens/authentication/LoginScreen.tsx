@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   BackHandler,
   Modal,
 } from 'react-native';
@@ -14,8 +13,6 @@ import Icon from 'react-native-vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
 import logoIcon from '../../../assets/Logo.png';
-import googleIcon from '../../../assets/google.png';
-import facebookIcon from '../../../assets/facebook.png';
 import { authService } from '../../services/authService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Keyboard, TouchableWithoutFeedback } from 'react-native';
@@ -115,14 +112,6 @@ export default function LoginScreen() {
   }
   };
 
- const handleGoogleLogin = async () => {
-  Alert.alert('Google Login coming soon...');
-};
-
-const handleFacebookLogin = () => {
-  Alert.alert('Facebook Login coming soon...');
-};
-
 const handleCopyEmail = async () => {
   try {
     // In React Native, use a clipboard library or implement copy functionality
@@ -132,7 +121,6 @@ const handleCopyEmail = async () => {
     console.log('Error copying email:', error);
   }
 };
-
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -203,24 +191,6 @@ const handleCopyEmail = async () => {
             <Text style={styles.buttonText}>Sign In</Text>
           </TouchableOpacity>
 
-          {/* Divider */}
-          {/* <View style={styles.divider}>
-            <View style={styles.line} />
-            <Text style={styles.orText}>OR</Text>
-            <View style={styles.line} />
-          </View> */}
-
-          {/* Google */}
-          {/* <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
-            <Image source={googleIcon} style={styles.socialIcon} />
-            <Text style={styles.socialText}>Continue with Google</Text>
-          </TouchableOpacity> */}
-
-          {/* Facebook */}
-          {/* <TouchableOpacity style={styles.socialButton} onPress={handleFacebookLogin}>
-            <Image source={facebookIcon} style={styles.socialIcon} />
-            <Text style={styles.socialText}>Continue with Facebook</Text>
-          </TouchableOpacity> */}
         </View>
         
         {/* Help */}
