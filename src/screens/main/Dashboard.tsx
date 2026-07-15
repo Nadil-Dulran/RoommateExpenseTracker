@@ -56,6 +56,18 @@ type DashboardExpense = {
   };
 };
 
+type DashboardExpenseResponse = {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  category: string;
+  paidBy: {
+    id: string;
+    name: string;
+  };
+};
+
 type DashboardData = {
   user: DashboardUser;
   summary: {
@@ -90,54 +102,21 @@ const toTimestamp = (value: any) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const getExpenseEmoji = (expense: any) => {
-  const directEmojiCandidates = [
-    expense?.emoji,
-    expense?.categoryEmoji,
-    expense?.category_emoji,
-    expense?.categoryIcon,
-    expense?.category_icon,
-    expense?.icon,
-    expense?.category?.emoji,
-    expense?.category?.icon,
-  ];
-
-  const directEmoji = directEmojiCandidates
-    .map(value => toSafeString(value))
-    .find(value => !!value);
-
-  if (directEmoji) {
-    return directEmoji;
-  }
-
-  const categoryKey = toSafeString(
-    expense?.category ?? expense?.type ?? expense?.categoryType ?? expense?.category_type,
-    'other'
-  ).toLowerCase() as DashboardCategory;
+const getExpenseEmoji = (category: string) => {
+  const categoryKey = toSafeString(category, 'other').toLowerCase() as DashboardCategory;
 
   return CATEGORY_EMOJI_BY_TYPE[categoryKey] ?? CATEGORY_EMOJI_BY_TYPE.other;
 };
 
-const normalizeRecentExpense = (expense: any): DashboardExpense => ({
-  id: toSafeString(expense?.id ?? expense?.expenseId ?? expense?.expense_id),
-  description: toSafeString(expense?.description ?? expense?.title, 'Expense'),
-  amount: toSafeNumber(expense?.amount ?? expense?.total ?? expense?.expense_amount),
-  date: toSafeString(
-    expense?.date ?? expense?.expense_date ?? expense?.createdAt ?? expense?.created_at,
-    new Date(0).toISOString()
-  ),
-  emoji: getExpenseEmoji(expense),
+const normalizeRecentExpense = (expense: DashboardExpenseResponse): DashboardExpense => ({
+  id: toSafeString(expense.id),
+  description: toSafeString(expense.description, 'Expense'),
+  amount: toSafeNumber(expense.amount),
+  date: toSafeString(expense.date, new Date(0).toISOString()),
+  emoji: getExpenseEmoji(expense.category),
   paidBy: {
-    id: toSafeString(
-      expense?.paidBy?.id ?? expense?.paid_by_id ?? expense?.paidById ?? expense?.userId
-    ),
-    name: toSafeString(
-      expense?.paidBy?.name ??
-        expense?.paid_by_name ??
-        expense?.paidByName ??
-        expense?.user?.name,
-      'Unknown'
-    ),
+    id: toSafeString(expense.paidBy?.id),
+    name: toSafeString(expense.paidBy?.name, 'Unknown'),
   },
 });
 
@@ -156,20 +135,20 @@ const normalizeDashboardData = (raw: any): DashboardData => {
     user: {
       id: toSafeString(user?.id),
       name: toSafeString(user?.name, 'User'),
-      avatarBase64: user?.avatarBase64 ?? user?.avatar_base64 ?? user?.avatar ?? null,
+      avatarBase64: user?.avatarBase64 ?? null,
       currency: toSafeString(user?.currency),
     },
     summary: {
-      totalOwed: toSafeNumber(summary?.totalOwed ?? summary?.total_owed),
-      totalOwing: toSafeNumber(summary?.totalOwing ?? summary?.total_owing),
-      totalBalance: toSafeNumber(summary?.totalBalance ?? summary?.total_balance),
+      totalOwed: toSafeNumber(summary?.totalOwed),
+      totalOwing: toSafeNumber(summary?.totalOwing),
+      totalBalance: toSafeNumber(summary?.totalBalance),
     },
     groups: groups.map((group: any) => ({
       id: toSafeString(group?.id),
       name: toSafeString(group?.name, 'Untitled Group'),
       emoji: toSafeString(group?.emoji, '👥'),
       updatedAt:
-        group?.updatedAt ?? group?.updated_at ?? group?.modifiedAt ?? group?.modified_at ?? group?.createdAt ?? group?.created_at ?? null,
+        normalizeGroupTimestamp(group),
       balance: {
         amount: toSafeNumber(group?.balance?.amount),
         isYouOwing: Boolean(group?.balance?.isYouOwing),
@@ -180,7 +159,7 @@ const normalizeDashboardData = (raw: any): DashboardData => {
 };
 
 const normalizeGroupTimestamp = (group: any) => {
-  return group?.updatedAt ?? group?.updated_at ?? group?.modifiedAt ?? group?.modified_at ?? group?.createdAt ?? group?.created_at ?? null;
+  return   group?.created_at ?? null;
 };
 
 type DashboardNavigationProp = CompositeNavigationProp<
@@ -226,22 +205,21 @@ export default function DashboardScreen() {
       return null;
     }
 
-    const normalizedValue = String(value).trim();
+    const normalizedValue = value.trim();
 
     if (!normalizedValue) {
       return null;
     }
-
-    if (normalizedValue.startsWith('http://') || normalizedValue.startsWith('https://')) {
+    if (
+       normalizedValue.startsWith('http://') ||
+       normalizedValue.startsWith('https://') ||
+       normalizedValue.startsWith('data:image')
+    ) {
       return normalizedValue;
     }
 
-    if (normalizedValue.startsWith('data:image')) {
-      return normalizedValue;
-    }
-
-    return `data:image/jpeg;base64,${normalizedValue.replace(/\s/g, '')}`;
-  };
+  return `data:image/jpeg;base64,${normalizedValue.replace(/\s/g, '')}`;
+    };
 
   const loadCurrentUserId = useCallback(async () => {
     try {
@@ -604,7 +582,7 @@ export default function DashboardScreen() {
           );
         })}
         {/* Recent Activity */}
-        <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
+        <Text style={[styles.sectionTitle, { marginTop: 20, marginBottom: 15 }]}>
           Recent Activity
         </Text>
 
@@ -876,7 +854,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 14,
     padding: 16,
-    marginTop: 15,
     marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
