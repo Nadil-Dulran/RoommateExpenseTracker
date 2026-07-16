@@ -1,14 +1,11 @@
 import { CategoryType } from '../types/expense';
 
-export type DashboardCategory =
-  | 'food'
-  | 'transport'
-  | 'shopping'
-  | 'bills'
-  | 'entertainment'
-  | 'other';
+  export const emojis: string[] = [
+  '🏠','✈️','📄','🎉','🍕','🎬','⚽','🎵',
+  '🏖️','🎮','🍺','🛒','💼','🎓','🏋','🎸'
+]; 
 
-export const CATEGORY_EMOJI_BY_TYPE: Record<DashboardCategory, string> = {
+export const CATEGORY_EMOJI_BY_TYPE: Record<CategoryType, string> = {
   food: '🍔',
   transport: '🚗',
   shopping: '🛍️',
