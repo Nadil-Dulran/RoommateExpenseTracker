@@ -14,8 +14,6 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
-import googleIcon from '../../../assets/google.png';
-import facebookIcon from '../../../assets/facebook.png';
 import logoIcon from '../../../assets/Logo.png';
 import { authService } from '../../services/authService';
 import { DEFAULT_CURRENCY_CODE } from '../../constants/currencies';
@@ -128,15 +126,6 @@ export default function SignupScreen() {
     setStatusMessage('Signup failed');
     setStatusType('error');
   }
-  };
-
-   const handleGoogleLogin = async () => {
-    // Navigate like success
-    navigation.navigate('Dashboard');
-  };
-  
-  const handleFacebookLogin = () => {
-    Alert.alert('Facebook Signup coming soon...');
   };
 
   return (
@@ -301,27 +290,9 @@ export default function SignupScreen() {
             </Text>
           ) : null}
 
-          {/* Divider */}
-          {/* <View style={styles.divider}>
-            <View style={styles.line} />
-            <Text style={styles.or}>OR</Text>
-            <View style={styles.line} />
-          </View> */}
-
-         {/* Google */}
-          {/* <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
-            <Image source={googleIcon} style={styles.socialIcon} />
-            <Text style={styles.socialText}>Continue with Google</Text>
-          </TouchableOpacity> */}
-
-          {/* Facebook */}
-          {/* <TouchableOpacity style={styles.socialButton} onPress={handleFacebookLogin}>
-            <Image source={facebookIcon} style={styles.socialIcon} />
-            <Text style={styles.socialText}>Continue with Facebook</Text>
-          </TouchableOpacity> */}
-
         </View>
    </ScrollView>
+   
         {/* Login */}
         <View style={styles.bottomRow}>
           <Text style={{ color: '#6a7282', fontSize: 15 }}>
