@@ -25,6 +25,7 @@ Roommate Expense Tracker is a cross-platform mobile app (Android & iOS) that sol
 | Layer | Repository |
 |---|---|
 | **Frontend (this repo)** | React Native mobile app |
+| code-refactoring ( Branch )|
 | **Backend** | [Nadil-Dulran/RMT_Backend](https://github.com/Nadil-Dulran/RMT_Backend.git) — Node.js + TypeScript REST API with MySQL |
 
 ---
