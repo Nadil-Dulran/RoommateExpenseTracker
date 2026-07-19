@@ -22,8 +22,8 @@ import { useNotifications } from '../../context/NotificationContext';
 import { dashboardService } from '../../services/dashboardService';
 import { groupsService } from '../../services/groupsService';
 import { settlementService } from '../../services/settlementService';
-import { CATEGORY_EMOJI_BY_TYPE, DashboardCategory } from '../../constants/emojis';
-import { Settlement } from '../../types';
+import { CATEGORY_EMOJI_BY_TYPE } from '../../constants/emojis';
+import { CategoryType, Settlement } from '../../types';
 import { extractSettlementsPayload, normalizeSettlement } from '../../utils/settlements';
 
 type DashboardUser = {
@@ -103,7 +103,7 @@ const toTimestamp = (value: any) => {
 };
 
 const getExpenseEmoji = (category: string) => {
-  const categoryKey = toSafeString(category, 'other').toLowerCase() as DashboardCategory;
+  const categoryKey = toSafeString(category, 'other').toLowerCase() as CategoryType;
 
   return CATEGORY_EMOJI_BY_TYPE[categoryKey] ?? CATEGORY_EMOJI_BY_TYPE.other;
 };
