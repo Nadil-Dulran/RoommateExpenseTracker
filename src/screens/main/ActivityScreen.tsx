@@ -11,25 +11,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
-
 import { RootStackParamList } from '../../types/navigation';
-import { Expense, Settlement } from '../../types';
+import { Expense, Settlement, CategoryType } from '../../types';
 import { useAppCurrency } from '../../context/CurrencyContext';
 import { expensesService } from '../../services/expensesService';
 import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
-import {
-  extractExpensesPayload,
-  normalizeExpense,
-  sortRawExpensesByLatest,
-} from '../../utils/expenses';
-import { CATEGORY_EMOJI_BY_TYPE, DashboardCategory } from '../../constants/emojis';
+import { extractExpensesPayload, normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
+import { CATEGORY_EMOJI_BY_TYPE } from '../../constants/emojis';
 import { settlementService } from '../../services/settlementService';
-import {
-  extractSettlementExpenseId,
-  extractSettlementsPayload,
-  normalizeSettlement,
-} from '../../utils/settlements';
+import { extractSettlementExpenseId, extractSettlementsPayload, normalizeSettlement } from '../../utils/settlements';
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList>;
 type FilterOption = 'all' | 'week' | 'month';
@@ -72,31 +63,6 @@ const ensureDateValue = (value: any): string | undefined => {
 
 const EARLIEST_ISO = new Date(0).toISOString();
 
-const resolveGroupTimestamp = (group: any) => {
-  const candidates = [
-    group?.createdAt,
-    group?.created_at,
-    group?.createdOn,
-    group?.created_on,
-    group?.created,
-    group?.createdDate,
-    group?.created_date,
-    group?.createdTime,
-    group?.created_time,
-    group?.createdTimestamp,
-    group?.created_timestamp,
-  ];
-
-  for (const candidate of candidates) {
-    const normalized = ensureDateValue(candidate);
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return undefined;
-};
-
 const extractMembersPayload = (data: any): any[] => {
   if (Array.isArray(data)) {
     return data;
@@ -126,7 +92,7 @@ const normalizeGroupInfo = (group: any): BackendGroup => ({
   id: String(group?.id ?? ''),
   name: group?.name || 'Untitled Group',
   emoji: group?.emoji || '👥',
-  createdAt: resolveGroupTimestamp(group),
+  createdAt: group?.created_at,
   members: Array.isArray(group?.members)
     ? group.members.map(normalizeMember)
     : Array.isArray(group?.users)
@@ -158,7 +124,7 @@ const extractNumericOrderFromId = (value?: string) => {
 };
 
 const getCategoryEmoji = (categoryValue?: string) => {
-  const normalized = String(categoryValue ?? 'other').toLowerCase() as DashboardCategory;
+  const normalized = String(categoryValue ?? 'other').toLowerCase() as CategoryType;
   return CATEGORY_EMOJI_BY_TYPE[normalized] ?? CATEGORY_EMOJI_BY_TYPE.other;
 };
 
