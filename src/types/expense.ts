@@ -6,7 +6,7 @@ export interface Split {
   percentage?: number;
 }
 
-export type CategoryType = 'food' | 'transport' | 'bills' | 'shopping' | 'entertainment' | 'other';
+export type CategoryType = 'food' | 'transport' | 'shopping' | 'bills' | 'entertainment' | 'other';
 
 export interface Expense {
   id: string;

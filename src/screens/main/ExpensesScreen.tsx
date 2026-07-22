@@ -1656,10 +1656,10 @@ card: {
   borderRadius: 20,
   padding: 15,
   marginBottom: 16,
-
   shadowColor: '#000',
-  shadowOpacity: 0.01,
-  elevation: 1,
+  shadowOpacity: 0.05,
+  elevation: 3,
+  shadowRadius: 8,
   overflow: 'visible',  
 },
 title: {

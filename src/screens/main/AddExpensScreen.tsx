@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Feather';
-import { categories } from '../../data/mockData';
+import { categories } from '../../constants/emojis';
 import { CategoryType } from '../../types';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -67,23 +67,7 @@ export default function AddExpenseScreen() {
     (raw || []).map((m: any, i: number) => ({
       id: String(m.id ?? `member-${i}`),
       name: m.name ?? 'Member',
-      avatarUri: toImageUri(
-        m.avatar ??
-        m.avatarBase64 ??
-        m.avatar_base64 ??
-        m.avatarbase64 ??
-        m.avatar_url ??
-        m.avatarUrl ??
-        m.profileImage ??
-        m.user?.avatarBase64 ??
-        m.user?.avatar_base64 ??
-        m.profile?.avatarBase64 ??
-        m.profile?.avatar_base64 ??
-        m.dataValues?.avatarBase64 ??
-        m.dataValues?.avatar_base64 ??
-        null,
-        m.avatarMimeType ?? m.avatar_mime_type ?? 'image/jpeg'
-      ),
+      avatarUri: toImageUri( m.avatar_base64 ?? null ),
     }));
 
   useEffect(() => {
@@ -319,6 +303,7 @@ export default function AddExpenseScreen() {
           value={description}
           onChangeText={setDescription}
           placeholder="What was this for?"
+          placeholderTextColor="#99A1AF"
           style={styles.input}
         />
 
@@ -759,6 +744,7 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     borderRadius: 14,
     padding: 14,
+    color: '#000000',
   },
 
   categoryGrid: {
@@ -974,6 +960,4 @@ dateText: {
   fontWeight: '400',
   color: '#101828',
 },
-
-
 });
