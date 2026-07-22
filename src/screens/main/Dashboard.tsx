@@ -441,7 +441,7 @@ export default function DashboardScreen() {
       const leftTimestamp = toTimestamp(left.updatedAt);
 
       return rightTimestamp - leftTimestamp;
-    });
+    }).slice(0, 3);
   }, [baseGroups, settlements, currentUserId]);
 
   const currentUser = dashboard?.user;
