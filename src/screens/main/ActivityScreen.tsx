@@ -3,7 +3,6 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Icon from 'react-native-vector-icons/Feather';
 import { RootStackParamList } from '../../types/navigation';
 import { Expense, Settlement } from '../../types';
 import { useAppCurrency } from '../../context/CurrencyContext';
@@ -21,6 +20,7 @@ import { DAY_IN_MS, EARLIEST_ISO, extractMembersPayload, ensureDateValue, normal
 } from '../../utils/activity';
 import { FilterOption, BackendGroup, TimelineEntry } from '../../types/activity';
 import GroupActivityCard from '../../components/activity/GroupActivityCard';
+import SettlementActivityCard from '../../components/activity/SettlementActivityCard';
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList>;
 
@@ -508,92 +508,7 @@ export default function ActivityScreen() {
     );
   };
 
-  const renderSettlementActivity = (entry: TimelineEntry) => {
-    if (!entry.settlement) {
-      return null;
-    }
 
-    const settlement = entry.settlement;
-    const group = groupMap.get(String(settlement.groupId));
-    const payerName = formatParticipantName(settlement.payerId, settlement.payerName);
-    const receiverName = formatParticipantName(settlement.receiverId, settlement.receiverName);
-    const methodLabel =
-      settlement.method === 'BANK'
-        ? 'Bank'
-        : settlement.method === 'UPI'
-        ? 'UPI'
-        : 'Cash';
-    const notes = settlement.notes?.trim();
-    const notesForDisplay = notes
-      ?.replace(/^\[expense:[^\]]+\]\s*/i, '')
-      .trim();
-
-    const relatedExpenseById = settlement.expenseId
-      ? expenses.find(expense => String(expense.id) === String(settlement.expenseId))
-      : undefined;
-
-    const relatedDescription = notesForDisplay
-      ? notesForDisplay
-          .replace(/^settlement\s+for\s+/i, '')
-          .trim()
-          .toLowerCase()
-      : undefined;
-
-    const relatedExpenseByDescription = relatedDescription
-      ? expenses.find(expense => {
-          if (String(expense.groupId) !== String(settlement.groupId)) {
-            return false;
-          }
-
-          return String(expense.description || '').trim().toLowerCase() === relatedDescription;
-        })
-      : undefined;
-
-    const relatedExpense = relatedExpenseById ?? relatedExpenseByDescription;
-
-    const settlementEmoji = getCategoryEmoji(relatedExpense?.category);
-
-    return (
-      <View key={entry.id} style={styles.card}>
-        <View style={styles.cardTop}>
-          <View style={styles.cardLeft}>
-            <View style={[styles.iconBox, styles.settlementIconBox]}>
-              <Text style={styles.icon}>{settlementEmoji}</Text>
-            </View>
-
-            <View>
-              <Text style={styles.expenseTitle}>Settlement recorded</Text>
-              {group && (
-                <Text style={styles.groupText}>
-                  {group.emoji} {group.name}
-                </Text>
-              )}
-              <Text style={styles.subText}>
-                {payerName} paid {receiverName}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={[styles.amount, styles.settlementAmount]}>
-            {formatCurrency(settlement.amount)}
-          </Text>
-        </View>
-
-        <View style={styles.participantRow}>
-          <Text style={styles.participantText}>{payerName}</Text>
-          <Icon name="arrow-right" size={16} color="#6a7282" />
-          <Text style={styles.participantText}>{receiverName}</Text>
-        </View>
-
-        <View style={styles.settlementMetaRow}>
-          <View style={styles.methodPill}>
-            <Text style={styles.methodText}>{methodLabel}</Text>
-          </View>
-          {notesForDisplay ? <Text style={styles.notesText}>{notesForDisplay}</Text> : null}
-        </View>
-      </View>
-    );
-  };
 
   const renderEntry = (entry: TimelineEntry) => {
     if (entry.kind === 'group_created') {
@@ -601,7 +516,12 @@ export default function ActivityScreen() {
     }
 
     if (entry.kind === 'settlement') {
-      return renderSettlementActivity(entry);
+      return <SettlementActivityCard
+      entry={entry}
+      expenses={expenses}
+      groupMap={groupMap}
+      formatCurrency={formatCurrency}
+      formatParticipantName={formatParticipantName}/>;
     }
 
     return renderExpenseActivity(entry);
