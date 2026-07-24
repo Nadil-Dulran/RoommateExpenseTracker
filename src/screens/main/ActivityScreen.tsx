@@ -1,146 +1,27 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
 import { RootStackParamList } from '../../types/navigation';
-import { Expense, Settlement, CategoryType } from '../../types';
+import { Expense, Settlement } from '../../types';
 import { useAppCurrency } from '../../context/CurrencyContext';
 import { expensesService } from '../../services/expensesService';
 import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
 import { extractExpensesPayload, normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
-import { CATEGORY_EMOJI_BY_TYPE } from '../../constants/emojis';
 import { settlementService } from '../../services/settlementService';
 import { extractSettlementExpenseId, extractSettlementsPayload, normalizeSettlement } from '../../utils/settlements';
+import { DAY_IN_MS, EARLIEST_ISO, extractMembersPayload, ensureDateValue, normalizeGroupInfo, roundCurrency, safeTimestamp,
+  compareTimelineEntries,
+  extractNumericOrderFromId,
+  getCategoryEmoji,
+  normalizeMember,
+} from '../../utils/activity';
+import { FilterOption, BackendGroup, TimelineEntry } from '../../types/activity';
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList>;
-type FilterOption = 'all' | 'week' | 'month';
-
-type GroupMember = { id: string; name: string };
-
-type BackendGroup = {
-  id: string;
-  name: string;
-  emoji: string;
-  createdAt?: string;
-  members: GroupMember[];
-};
-
-type TimelineEntry = {
-  id: string;
-  kind: 'expense' | 'settlement' | 'group_created';
-  date: string;
-  sortTime: number;
-  orderId: number;
-  expense?: Expense;
-  group?: BackendGroup;
-  settlement?: Settlement;
-};
-
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
-
-const ensureDateValue = (value: any): string | undefined => {
-  if (!value) {
-    return undefined;
-  }
-
-  const timestamp = Date.parse(String(value));
-  if (!Number.isFinite(timestamp)) {
-    return undefined;
-  }
-
-  return new Date(timestamp).toISOString();
-};
-
-const EARLIEST_ISO = new Date(0).toISOString();
-
-const extractMembersPayload = (data: any): any[] => {
-  if (Array.isArray(data)) {
-    return data;
-  }
-
-  if (Array.isArray(data?.data)) {
-    return data.data;
-  }
-
-  if (Array.isArray(data?.members)) {
-    return data.members;
-  }
-
-  return [];
-};
-
-const normalizeMember = (member: any): GroupMember => ({
-  id: String(member?.id ?? member?.user_id ?? member?.userId ?? ''),
-  name:
-    member?.name ??
-    member?.user?.name ??
-    member?.full_name ??
-    'Member',
-});
-
-const normalizeGroupInfo = (group: any): BackendGroup => ({
-  id: String(group?.id ?? ''),
-  name: group?.name || 'Untitled Group',
-  emoji: group?.emoji || '👥',
-  createdAt: group?.created_at,
-  members: Array.isArray(group?.members)
-    ? group.members.map(normalizeMember)
-    : Array.isArray(group?.users)
-    ? group.users.map(normalizeMember)
-    : [],
-});
-
-const roundCurrency = (value: number) => {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-};
-
-const safeTimestamp = (value?: string) => {
-  const parsed = Date.parse(String(value ?? ''));
-  return Number.isFinite(parsed) ? parsed : Date.parse(EARLIEST_ISO);
-};
-
-const extractNumericOrderFromId = (value?: string) => {
-  if (!value) {
-    return 0;
-  }
-
-  const matches = String(value).match(/\d+/g);
-  if (!matches || matches.length === 0) {
-    return 0;
-  }
-
-  const parsed = Number(matches[matches.length - 1]);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const getCategoryEmoji = (categoryValue?: string) => {
-  const normalized = String(categoryValue ?? 'other').toLowerCase() as CategoryType;
-  return CATEGORY_EMOJI_BY_TYPE[normalized] ?? CATEGORY_EMOJI_BY_TYPE.other;
-};
-
-const compareTimelineEntries = (a: TimelineEntry, b: TimelineEntry) => {
-  const timeDiff = b.sortTime - a.sortTime;
-  if (timeDiff !== 0) {
-    return timeDiff;
-  }
-
-  const idDiff = b.orderId - a.orderId;
-  if (idDiff !== 0) {
-    return idDiff;
-  }
-
-  return b.id.localeCompare(a.id);
-};
 
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProps>();
@@ -184,7 +65,7 @@ export default function ActivityScreen() {
         : [];
 
       const baseGroups = groupList.map(normalizeGroupInfo);
-      const groupsWithMembers = await Promise.all(
+      const groupsWithMembers: BackendGroup[] = await Promise.all(
         baseGroups.map(async group => {
           try {
             const membersResponse = await groupMembersService.getMembers(group.id);
@@ -309,7 +190,7 @@ export default function ActivityScreen() {
     }
   }, []);
 
-  const loadAllData = useCallback(
+  const loadInitialData = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {
       const loadId = latestLoadIdRef.current + 1;
       latestLoadIdRef.current = loadId;
@@ -335,13 +216,13 @@ export default function ActivityScreen() {
   );
 
   useEffect(() => {
-    loadAllData('initial');
-  }, [loadAllData]);
+    loadInitialData('initial');
+  }, [loadInitialData]);
 
   useFocusEffect(
     useCallback(() => {
-      loadAllData('refresh');
-    }, [loadAllData])
+      loadInitialData('refresh');
+    }, [loadInitialData])
   );
 
   const groupMap = useMemo(() => {
@@ -758,7 +639,7 @@ export default function ActivityScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => loadAllData('refresh')} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadInitialData('refresh')} />
         }
       >
         <View style={styles.header}>
