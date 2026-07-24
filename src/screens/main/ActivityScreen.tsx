@@ -20,6 +20,7 @@ import { DAY_IN_MS, EARLIEST_ISO, extractMembersPayload, ensureDateValue, normal
   normalizeMember,
 } from '../../utils/activity';
 import { FilterOption, BackendGroup, TimelineEntry } from '../../types/activity';
+import GroupActivityCard from '../../components/activity/GroupActivityCard';
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList>;
 
@@ -376,35 +377,7 @@ export default function ActivityScreen() {
     [currentUserId]
   );
 
-  const renderGroupActivity = (entry: TimelineEntry) => {
-    if (!entry.group) {
-      return null;
-    }
-
-    const memberCount = entry.group.members.length;
-
-    return (
-      <View key={entry.id} style={styles.card}>
-        <View style={styles.cardTop}>
-          <View style={styles.cardLeft}>
-            <View style={styles.iconBox}>
-              <Text style={styles.icon}>{entry.group.emoji}</Text>
-            </View>
-
-            <View>
-              <Text style={styles.expenseTitle}>{entry.group.name}</Text>
-              <Text style={styles.groupText}>New group created</Text>
-              <Text style={styles.subText}>
-                {memberCount} {memberCount === 1 ? 'member' : 'members'} joined
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.amount}>New</Text>
-        </View>
-      </View>
-    );
-  };
+ 
 
   const renderExpenseActivity = (entry: TimelineEntry) => {
     if (!entry.expense) {
@@ -624,7 +597,7 @@ export default function ActivityScreen() {
 
   const renderEntry = (entry: TimelineEntry) => {
     if (entry.kind === 'group_created') {
-      return renderGroupActivity(entry);
+    return <GroupActivityCard entry={entry}/>;
     }
 
     if (entry.kind === 'settlement') {
