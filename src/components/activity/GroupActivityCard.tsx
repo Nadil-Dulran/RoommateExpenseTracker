@@ -16,7 +16,7 @@ export default function GroupActivityCard({
         const memberCount = entry.group.members.length;
     
         return (
-          <View key={entry.id} style={styles.card}>
+          <View style={styles.card}>
             <View style={styles.cardTop}>
               <View style={styles.cardLeft}>
                 <View style={styles.iconBox}>
