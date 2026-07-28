@@ -1,146 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Icon from 'react-native-vector-icons/Feather';
 import { RootStackParamList } from '../../types/navigation';
-import { Expense, Settlement, CategoryType } from '../../types';
+import { Expense, Settlement } from '../../types';
 import { useAppCurrency } from '../../context/CurrencyContext';
 import { expensesService } from '../../services/expensesService';
 import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
-import { extractExpensesPayload, normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
-import { CATEGORY_EMOJI_BY_TYPE } from '../../constants/emojis';
+import { normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
 import { settlementService } from '../../services/settlementService';
 import { extractSettlementExpenseId, extractSettlementsPayload, normalizeSettlement } from '../../utils/settlements';
+import { DAY_IN_MS, EARLIEST_ISO, extractMembersPayload, ensureDateValue, normalizeGroupInfo, roundCurrency, safeTimestamp,
+  compareTimelineEntries,
+  extractNumericOrderFromId,
+  normalizeMember,
+} from '../../utils/activity';
+import { FilterOption, BackendGroup, TimelineEntry } from '../../types/activity';
+import GroupActivityCard from '../../components/activity/GroupActivityCard';
+import SettlementActivityCard from '../../components/activity/SettlementActivityCard';
+import ExpenseActivityCard from '../../components/activity/ExpenseActivityCard';
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList>;
-type FilterOption = 'all' | 'week' | 'month';
-
-type GroupMember = { id: string; name: string };
-
-type BackendGroup = {
-  id: string;
-  name: string;
-  emoji: string;
-  createdAt?: string;
-  members: GroupMember[];
-};
-
-type TimelineEntry = {
-  id: string;
-  kind: 'expense' | 'settlement' | 'group_created';
-  date: string;
-  sortTime: number;
-  orderId: number;
-  expense?: Expense;
-  group?: BackendGroup;
-  settlement?: Settlement;
-};
-
-const DAY_IN_MS = 24 * 60 * 60 * 1000;
-
-const ensureDateValue = (value: any): string | undefined => {
-  if (!value) {
-    return undefined;
-  }
-
-  const timestamp = Date.parse(String(value));
-  if (!Number.isFinite(timestamp)) {
-    return undefined;
-  }
-
-  return new Date(timestamp).toISOString();
-};
-
-const EARLIEST_ISO = new Date(0).toISOString();
-
-const extractMembersPayload = (data: any): any[] => {
-  if (Array.isArray(data)) {
-    return data;
-  }
-
-  if (Array.isArray(data?.data)) {
-    return data.data;
-  }
-
-  if (Array.isArray(data?.members)) {
-    return data.members;
-  }
-
-  return [];
-};
-
-const normalizeMember = (member: any): GroupMember => ({
-  id: String(member?.id ?? member?.user_id ?? member?.userId ?? ''),
-  name:
-    member?.name ??
-    member?.user?.name ??
-    member?.full_name ??
-    'Member',
-});
-
-const normalizeGroupInfo = (group: any): BackendGroup => ({
-  id: String(group?.id ?? ''),
-  name: group?.name || 'Untitled Group',
-  emoji: group?.emoji || '👥',
-  createdAt: group?.created_at,
-  members: Array.isArray(group?.members)
-    ? group.members.map(normalizeMember)
-    : Array.isArray(group?.users)
-    ? group.users.map(normalizeMember)
-    : [],
-});
-
-const roundCurrency = (value: number) => {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-};
-
-const safeTimestamp = (value?: string) => {
-  const parsed = Date.parse(String(value ?? ''));
-  return Number.isFinite(parsed) ? parsed : Date.parse(EARLIEST_ISO);
-};
-
-const extractNumericOrderFromId = (value?: string) => {
-  if (!value) {
-    return 0;
-  }
-
-  const matches = String(value).match(/\d+/g);
-  if (!matches || matches.length === 0) {
-    return 0;
-  }
-
-  const parsed = Number(matches[matches.length - 1]);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const getCategoryEmoji = (categoryValue?: string) => {
-  const normalized = String(categoryValue ?? 'other').toLowerCase() as CategoryType;
-  return CATEGORY_EMOJI_BY_TYPE[normalized] ?? CATEGORY_EMOJI_BY_TYPE.other;
-};
-
-const compareTimelineEntries = (a: TimelineEntry, b: TimelineEntry) => {
-  const timeDiff = b.sortTime - a.sortTime;
-  if (timeDiff !== 0) {
-    return timeDiff;
-  }
-
-  const idDiff = b.orderId - a.orderId;
-  if (idDiff !== 0) {
-    return idDiff;
-  }
-
-  return b.id.localeCompare(a.id);
-};
 
 export default function ActivityScreen() {
   const navigation = useNavigation<NavigationProps>();
@@ -184,7 +66,7 @@ export default function ActivityScreen() {
         : [];
 
       const baseGroups = groupList.map(normalizeGroupInfo);
-      const groupsWithMembers = await Promise.all(
+      const groupsWithMembers: BackendGroup[] = await Promise.all(
         baseGroups.map(async group => {
           try {
             const membersResponse = await groupMembersService.getMembers(group.id);
@@ -236,16 +118,13 @@ export default function ActivityScreen() {
     };
 
     try {
-      const response = await expensesService.getExpenses();
-      const directList = extractExpensesPayload(response);
-      const rawList = directList.length > 0 ? directList : await loadByGroups();
+      const rawList = await loadByGroups();
       const normalized = sortRawExpensesByLatest(rawList)
-        .map(item => normalizeExpense(item))
-        .filter(item => !!item.id);
-
-      if (latestExpenseLoadIdRef.current === expenseLoadId) {
-        setExpenses(normalized);
-      }
+          .map(item => normalizeExpense(item))
+          .filter(item => !!item.id);
+  if (latestExpenseLoadIdRef.current === expenseLoadId) {
+    setExpenses(normalized);
+  }
     } catch (error) {
       console.log('Failed to load activity expenses directly', error);
       try {
@@ -309,7 +188,7 @@ export default function ActivityScreen() {
     }
   }, []);
 
-  const loadAllData = useCallback(
+  const loadInitialData = useCallback(
     async (mode: 'initial' | 'refresh' = 'initial') => {
       const loadId = latestLoadIdRef.current + 1;
       latestLoadIdRef.current = loadId;
@@ -335,13 +214,13 @@ export default function ActivityScreen() {
   );
 
   useEffect(() => {
-    loadAllData('initial');
-  }, [loadAllData]);
+    loadInitialData('initial');
+  }, [loadInitialData]);
 
   useFocusEffect(
     useCallback(() => {
-      loadAllData('refresh');
-    }, [loadAllData])
+      loadInitialData('refresh');
+    }, [loadInitialData])
   );
 
   const groupMap = useMemo(() => {
@@ -495,262 +374,34 @@ export default function ActivityScreen() {
     [currentUserId]
   );
 
-  const renderGroupActivity = (entry: TimelineEntry) => {
-    if (!entry.group) {
-      return null;
-    }
-
-    const memberCount = entry.group.members.length;
-
-    return (
-      <View key={entry.id} style={styles.card}>
-        <View style={styles.cardTop}>
-          <View style={styles.cardLeft}>
-            <View style={styles.iconBox}>
-              <Text style={styles.icon}>{entry.group.emoji}</Text>
-            </View>
-
-            <View>
-              <Text style={styles.expenseTitle}>{entry.group.name}</Text>
-              <Text style={styles.groupText}>New group created</Text>
-              <Text style={styles.subText}>
-                {memberCount} {memberCount === 1 ? 'member' : 'members'} joined
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.amount}>New</Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderExpenseActivity = (entry: TimelineEntry) => {
-    if (!entry.expense) {
-      return null;
-    }
-
-    const expense = entry.expense;
-    const group = groupMap.get(String(expense.groupId));
-    const categoryEmoji = getCategoryEmoji(expense.category);
-    const share = getShareForExpense(expense);
-
-    const splits = Array.isArray(expense.splits) ? expense.splits : [];
-    const normalizedSplits = splits
-      .map(split => ({
-        userId: String(split.userId ?? ''),
-        amount: Number(split.amount ?? 0),
-      }))
-      .filter(split => !!split.userId);
-
-    const payerName =
-      expense.paidBy?.name && expense.paidBy.name !== 'Unknown'
-        ? expense.paidBy.name
-        : group?.members.find(member => member.id === String(expense.paidBy?.id))?.name ||
-          `Member ${expense.paidBy?.id}`;
-
-    const isMyExpense = String(expense.paidBy?.id) === String(currentUserId);
-    const counterpartyId = isMyExpense
-      ? normalizedSplits.find(split => split.userId !== String(currentUserId))?.userId ?? ''
-      : String(expense.paidBy?.id ?? '');
-
-    const counterpartyName =
-      group?.members.find(member => member.id === counterpartyId)?.name ??
-      (isMyExpense && counterpartyId ? `Member ${counterpartyId}` : payerName);
-
-    const splitParticipantsForSettle = normalizedSplits.map(split => ({
-      userId: split.userId,
-      amount: roundCurrency(split.amount),
-      name:
-        split.userId === String(currentUserId)
-          ? 'You'
-          : split.userId === String(expense.paidBy?.id)
-          ? payerName
-          : group?.members.find(member => member.id === split.userId)?.name ??
-            `Member ${split.userId}`,
-    }));
-
-    const isExpenseSettled = settledExpenseIds.has(String(expense.id));
-
-    const canSettle =
-      !!share &&
-      entry.kind !== 'settlement' &&
-      !isExpenseSettled &&
-      share.amount >= 0.01 &&
-      !!counterpartyId &&
-      !!expense.groupId;
-
-    return (
-      <View key={entry.id} style={styles.card}>
-        <View style={styles.cardTop}>
-          <View style={styles.cardLeft}>
-            <View style={styles.iconBox}>
-              <Text style={styles.icon}>{categoryEmoji}</Text>
-            </View>
-
-            <View>
-              <Text style={styles.expenseTitle}>{expense.description}</Text>
-
-              {group && (
-                <Text style={styles.groupText}>
-                  {group.emoji} {group.name}
-                </Text>
-              )}
-
-              <Text style={styles.subText}>
-                {payerName} paid • Split {normalizedSplits.length || 1}{' '}
-                {normalizedSplits.length === 1 ? 'way' : 'ways'}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.amount}>{formatCurrency(expense.amount)}</Text>
-        </View>
-
-        {share && (
-          <View style={styles.shareRow}>
-            <Text
-              style={[
-                styles.shareText,
-                share.type === 'owed' ? styles.shareTextOwed : styles.shareTextOwing,
-              ]}
-            >
-              {isExpenseSettled
-                ? 'Settled'
-                : share.type === 'owed'
-                ? `You're owed ${formatCurrency(share.amount)}`
-                : `You owe ${formatCurrency(share.amount)}`}
-            </Text>
-
-            {canSettle && (
-              <TouchableOpacity
-                style={styles.settleBtn}
-                onPress={() =>
-                  navigation.navigate('SettleUp', {
-                    mode: 'single',
-                    memberId: counterpartyId,
-                    amount: share.amount,
-                    memberName: counterpartyName,
-                    isYouPaying: share.type === 'owing',
-                    groupId: String(expense.groupId),
-                    expenseContext: {
-                      expenseId: String(expense.id),
-                      description: expense.description,
-                      amount: roundCurrency(expense.amount),
-                      groupId: String(expense.groupId),
-                      groupName: group?.name,
-                      paidBy: { id: String(expense.paidBy?.id ?? ''), name: payerName },
-                      splits: splitParticipantsForSettle,
-                    },
-                  })
-                }
-              >
-                <Text style={styles.settleBtnText}>Settle Up</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </View>
-    );
-  };
-
-  const renderSettlementActivity = (entry: TimelineEntry) => {
-    if (!entry.settlement) {
-      return null;
-    }
-
-    const settlement = entry.settlement;
-    const group = groupMap.get(String(settlement.groupId));
-    const payerName = formatParticipantName(settlement.payerId, settlement.payerName);
-    const receiverName = formatParticipantName(settlement.receiverId, settlement.receiverName);
-    const methodLabel =
-      settlement.method === 'BANK'
-        ? 'Bank'
-        : settlement.method === 'UPI'
-        ? 'UPI'
-        : 'Cash';
-    const notes = settlement.notes?.trim();
-    const notesForDisplay = notes
-      ?.replace(/^\[expense:[^\]]+\]\s*/i, '')
-      .trim();
-
-    const relatedExpenseById = settlement.expenseId
-      ? expenses.find(expense => String(expense.id) === String(settlement.expenseId))
-      : undefined;
-
-    const relatedDescription = notesForDisplay
-      ? notesForDisplay
-          .replace(/^settlement\s+for\s+/i, '')
-          .trim()
-          .toLowerCase()
-      : undefined;
-
-    const relatedExpenseByDescription = relatedDescription
-      ? expenses.find(expense => {
-          if (String(expense.groupId) !== String(settlement.groupId)) {
-            return false;
-          }
-
-          return String(expense.description || '').trim().toLowerCase() === relatedDescription;
-        })
-      : undefined;
-
-    const relatedExpense = relatedExpenseById ?? relatedExpenseByDescription;
-
-    const settlementEmoji = getCategoryEmoji(relatedExpense?.category);
-
-    return (
-      <View key={entry.id} style={styles.card}>
-        <View style={styles.cardTop}>
-          <View style={styles.cardLeft}>
-            <View style={[styles.iconBox, styles.settlementIconBox]}>
-              <Text style={styles.icon}>{settlementEmoji}</Text>
-            </View>
-
-            <View>
-              <Text style={styles.expenseTitle}>Settlement recorded</Text>
-              {group && (
-                <Text style={styles.groupText}>
-                  {group.emoji} {group.name}
-                </Text>
-              )}
-              <Text style={styles.subText}>
-                {payerName} paid {receiverName}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={[styles.amount, styles.settlementAmount]}>
-            {formatCurrency(settlement.amount)}
-          </Text>
-        </View>
-
-        <View style={styles.participantRow}>
-          <Text style={styles.participantText}>{payerName}</Text>
-          <Icon name="arrow-right" size={16} color="#6a7282" />
-          <Text style={styles.participantText}>{receiverName}</Text>
-        </View>
-
-        <View style={styles.settlementMetaRow}>
-          <View style={styles.methodPill}>
-            <Text style={styles.methodText}>{methodLabel}</Text>
-          </View>
-          {notesForDisplay ? <Text style={styles.notesText}>{notesForDisplay}</Text> : null}
-        </View>
-      </View>
-    );
-  };
-
   const renderEntry = (entry: TimelineEntry) => {
+
     if (entry.kind === 'group_created') {
-      return renderGroupActivity(entry);
+      return <GroupActivityCard 
+      key={entry.id}
+      entry={entry}/>;
     }
 
     if (entry.kind === 'settlement') {
-      return renderSettlementActivity(entry);
+      return <SettlementActivityCard
+      key={entry.id}
+      entry={entry}
+      expenses={expenses}
+      groupMap={groupMap}
+      formatCurrency={formatCurrency}
+      formatParticipantName={formatParticipantName}/>;
     }
 
-    return renderExpenseActivity(entry);
+    return (<ExpenseActivityCard
+     key={entry.id}
+     entry={entry}
+     navigation={navigation}
+     groupMap={groupMap}
+     currentUserId={currentUserId}
+     settledExpenseIds={settledExpenseIds}
+     formatCurrency={formatCurrency}
+     getShareForExpense={getShareForExpense}/>
+    );
   };
 
   return (
@@ -758,7 +409,7 @@ export default function ActivityScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => loadAllData('refresh')} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadInitialData('refresh')} />
         }
       >
         <View style={styles.header}>
@@ -845,134 +496,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6a7282',
     marginBottom: 10,
-  },
-  card: {
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  cardLeft: {
-    flexDirection: 'row',
-    gap: 10,
-    flex: 1,
-  },
-  iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  settlementIconBox: {
-    backgroundColor: '#ecfdf3',
-  },
-  icon: {
-    fontSize: 20,
-  },
-  expenseTitle: {
-    fontWeight: '600',
-    fontSize: 15,
-    color: '#101828',
-  },
-  groupText: {
-    fontSize: 12,
-    color: '#99a1af',
-    marginTop: 2,
-  },
-  subText: {
-    fontSize: 12,
-    color: '#6a7282',
-    marginTop: 2,
-  },
-  amount: {
-    fontWeight: '700',
-    fontSize: 16,
-    color: '#101828',
-  },
-  shareRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  shareText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  shareTextOwed: {
-    color: '#009966',
-  },
-  shareTextOwing: {
-    color: '#ff2056',
-  },
-  settleBtn: {
-    backgroundColor: '#009966',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  settleBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  settledBadge: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  settledText: {
-    color: '#16a34a',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  participantRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 8,
-    marginTop: 12,
-  },
-  participantText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#101828',
-  },
-  settlementMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    gap: 8,
-  },
-  methodPill: {
-    borderRadius: 999,
-    backgroundColor: '#ecfdf3',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  methodText: {
-    color: '#047857',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  notesText: {
-    fontSize: 12,
-    color: '#6a7282',
-    flex: 1,
-  },
-  settlementAmount: {
-    color: '#16a34a',
   },
   contentWrap: {
     padding: 16,

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,6 +25,8 @@ import { extractSettlementsPayload, normalizeSettlement } from '../../utils/sett
 import profileIcon from '../../../assets/ProfileIcon.png';
 import { useAppCurrency } from '../../context/CurrencyContext';
 import { Settlement } from '../../types';
+import { emojis } from '../../constants/emojis';
+import GroupModal from '../../components/groups/GroupModal';
 
 type GroupsNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BottomTabParamList, 'Groups'>,
@@ -47,7 +48,7 @@ export default function GroupsScreen() {
   const [showJoin, setShowJoin] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [joinLink, setJoinLink] = useState('');
-  const [selectedEmoji, setSelectedEmoji] = useState('🏠');
+  const [selectedEmoji, setSelectedEmoji] = useState(emojis[0]);
 
   const toImageUri = useCallback((value?: string | null, mimeType?: string | null) => {
     if (!value) {
@@ -59,11 +60,9 @@ export default function GroupsScreen() {
     if (!normalizedValue) {
       return null;
     }
-
     if (normalizedValue.startsWith('http://') || normalizedValue.startsWith('https://')) {
       return normalizedValue;
     }
-
     if (normalizedValue.startsWith('data:image')) {
       return normalizedValue;
     }
@@ -143,7 +142,7 @@ export default function GroupsScreen() {
       members,
       isYouOwing: group.balance?.isYouOwing ?? false,
       amount: group.balance?.amount ?? 0,
-      updatedAt: group.updatedAt ?? group.updated_at ?? group.modifiedAt ?? group.modified_at ?? group.createdAt ?? group.created_at ?? null,
+      updatedAt: group.created_at ?? null,
     };
   }, [normalizeMembers]);
 
@@ -185,10 +184,10 @@ export default function GroupsScreen() {
 
       const sortedGroups = [...groupsWithMembers].sort((left, right) => {
         const rightTimestamp = toTimestamp(
-          right?.updatedAt ?? right?.updated_at ?? right?.modifiedAt ?? right?.modified_at ?? right?.createdAt ?? right?.created_at
+          right?.updatedAt 
         );
         const leftTimestamp = toTimestamp(
-          left?.updatedAt ?? left?.updated_at ?? left?.modifiedAt ?? left?.modified_at ?? left?.createdAt ?? left?.created_at
+          left?.updatedAt 
         );
 
         return rightTimestamp - leftTimestamp;
@@ -345,21 +344,19 @@ export default function GroupsScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadGroups();
-  }, [loadGroups]);
-
-  useEffect(() => {
-    loadExpenses();
-  }, [loadExpenses]);
-
-  useEffect(() => {
-    loadCurrentUserId();
-  }, [loadCurrentUserId]);
-
-  useEffect(() => {
-    loadSettlements();
-  }, [loadSettlements]);
+ useEffect(() => {
+  void Promise.all([
+    loadGroups(),
+    loadExpenses(),
+    loadCurrentUserId(),
+    loadSettlements(),
+  ]);
+  }, [
+    loadGroups,
+    loadExpenses,
+    loadCurrentUserId,
+    loadSettlements,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -453,31 +450,24 @@ export default function GroupsScreen() {
   }, [groups, expenses, currentUserId, settlements]);
 
   const handleCreateGroup = async () => {
-
     try {
-
       await groupsService.createGroup({
         name: groupName,
         description: '',
         emoji: selectedEmoji,
       });
-
       setGroupName('');
       setShowCreate(false);
-
       await loadGroups();
 
     } catch (error) {
-
       console.log('Create group failed', error);
       
       Alert.alert(
         'Create group failed',
         error instanceof Error ? error.message : 'Unknown error'
       );
-
     }
-
   };
 
   const extractGroupIdFromLink = useCallback((value: string) => {
@@ -507,11 +497,6 @@ export default function GroupsScreen() {
     });
   };
 
-  const emojis: string[] = [
-  '🏠','✈️','📄','🎉','🍕','🎬','⚽','🎵',
-  '🏖️','🎮','🍺','🛒','💼','🎓','🏋','🎸'
-];
-
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -523,8 +508,6 @@ export default function GroupsScreen() {
             <Text style={styles.subtitle}>
               Manage your expense groups
             </Text>
-
-            
           </View>
 
           <TouchableOpacity
@@ -627,157 +610,60 @@ export default function GroupsScreen() {
             </TouchableOpacity>
           );
         })}
-
       </ScrollView>
 
-      {showCreate && (
-  <View style={styles.overlay}>
-    <View style={styles.modalCard}>
-
-      {/* Header */}
-      <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Create Group</Text>
-        <TouchableOpacity onPress={() => setShowCreate(false)}>
-          <Icon name="x" size={22} color="#6A7282" />
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.modalDescription}>
-        Create a new group to split expenses with friends
-      </Text>
-
-      {/* Group Name */}
-      <Text style={styles.label}>Group Name</Text>
-      <TextInput
-        value={groupName}
-        onChangeText={setGroupName}
-        placeholder="e.g., Roommates, Trip to Paris..."
-        placeholderTextColor="#99A1AF"
-        style={styles.input}
-      />
-
-      {/* Emoji */}
+     <GroupModal
+       visible={showCreate}
+       title="Create Group"
+       description="Create a new group to split expenses with friends"
+       label="Group Name"
+       value={groupName}
+       placeholder="e.g., Roommates, Trip to Paris..."
+       confirmText="Create Group"
+       disabled={!groupName.trim()}
+       onChangeText={setGroupName}
+       onClose={() => setShowCreate(false)}
+       onConfirm={handleCreateGroup}
+     >
       <Text style={[styles.label, { marginTop: 20 }]}>
-        Choose an Emoji
+       Choose an Emoji
       </Text>
 
       <View style={styles.emojiGrid}>
-        {emojis.map((emoji: string) => {
-          const selected = selectedEmoji === emoji;
+       {emojis.map(emoji => {
+        const selected = selectedEmoji === emoji;
 
-          return (
+         return (
             <TouchableOpacity
               key={emoji}
               onPress={() => setSelectedEmoji(emoji)}
               style={[
-                styles.emojiItem,
-                selected && styles.selectedEmoji,
-              ]}
-            >
+                  styles.emojiItem,
+                  selected && styles.selectedEmoji,
+               ]}
+             >
               <Text style={{ fontSize: 22 }}>{emoji}</Text>
             </TouchableOpacity>
-          );
-        })}
+         );
+      })}
       </View>
+     </GroupModal>
 
-      {/* Buttons */}
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={styles.cancelBtn}
-          onPress={() => setShowCreate(false)}
-        >
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          disabled={!groupName.trim()}
-          style={[
-            styles.createBtn,
-            !groupName.trim() && styles.disabledBtn,
-          ]}
-          onPress={handleCreateGroup}
-        >
-          <Icon
-            name="check"
-            size={16}
-            color={groupName.trim() ? '#fff' : '#9CA3AF'}
-          />
-          <Text
-            style={[
-              styles.createText,
-              !groupName.trim() && { color: '#9CA3AF' },
-            ]}
-          >
-            Create Group
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-    </View>
-  </View>
-)}
-
-      {showJoin && (
-        <View style={styles.overlay}>
-          <View style={styles.modalCard}>
-
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Join Group</Text>
-              <TouchableOpacity onPress={() => setShowJoin(false)}>
-                <Icon name="x" size={22} color="#6A7282" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalDescription}>
-              Paste a roommate invite link to join a group
-            </Text>
-
-            <Text style={styles.label}>Invite Link</Text>
-            <TextInput
-              value={joinLink}
-              onChangeText={setJoinLink}
-              placeholder="roommate://group/123"
-              placeholderTextColor="#99A1AF"
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.input}
-            />
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setShowJoin(false)}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                disabled={!joinLink.trim()}
-                style={[
-                  styles.createBtn,
-                  !joinLink.trim() && styles.disabledBtn,
-                ]}
-                onPress={handleJoinGroup}
-              >
-                <Icon
-                  name="check"
-                  size={16}
-                  color={joinLink.trim() ? '#fff' : '#9CA3AF'}
-                />
-                <Text
-                  style={[
-                    styles.createText,
-                    !joinLink.trim() && { color: '#9CA3AF' },
-                  ]}
-                >
-                  Join Group
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
-
+     <GroupModal
+       visible={showJoin}
+       title="Join Group"
+       description="Paste a roommate invite link to join a group"
+       label="Invite Link"
+       value={joinLink}
+       placeholder="roommate://group/123"
+       confirmText="Join Group"
+       disabled={!joinLink.trim()}
+       autoCapitalize="none"
+       autoCorrect={false}
+       onChangeText={setJoinLink}
+       onClose={() => setShowJoin(false)}
+       onConfirm={handleJoinGroup}
+      />
 
     </View>
   );
@@ -913,55 +799,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  overlay: {
-  ...StyleSheet.absoluteFillObject,
-  backgroundColor: 'rgba(0,0,0,0.45)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  padding: 20,
-},
-
-modalCard: {
-  width: '100%',
-  backgroundColor: '#fff',
-  borderRadius: 28,
-  padding: 24,
-},
-
-modalHeader: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-},
-
-modalTitle: {
-  fontSize: 22,
-  fontWeight: '700',
-  color: '#101828',
-},
-
-modalDescription: {
-  fontSize: 14,
-  color: '#6A7282',
-  marginTop: 12,
-  marginBottom: 20,
-},
-
-label: {
-  fontSize: 13,
-  fontWeight: '600',
-  color: '#6A7282',
-  marginBottom: 8,
-},
-
-input: {
-  borderWidth: 1,
-  borderColor: '#009966',
-  borderRadius: 20,
-  padding: 14,
-  fontSize: 15,
-},
-
 emojiGrid: {
   flexDirection: 'row',
   flexWrap: 'wrap',
@@ -984,45 +821,13 @@ selectedEmoji: {
   backgroundColor: '#ECFDF5',
 },
 
-buttonRow: {
-  flexDirection: 'row',
-  marginTop: 24,
-  gap: 12,
-},
-
-cancelBtn: {
-  flex: 1,
-  backgroundColor: '#F3F4F6',
-  paddingVertical: 16,
-  borderRadius: 20,
-  alignItems: 'center',
-},
-
-cancelText: {
-  fontSize: 15,
+label: {
+  fontSize: 13,
   fontWeight: '600',
+  color: '#6A7282',
+  marginBottom: 8,
 },
 
-createBtn: {
-  flex: 1,
-  backgroundColor: '#009966',
-  paddingVertical: 16,
-  borderRadius: 20,
-  flexDirection: 'row',
-  justifyContent: 'center',
-  alignItems: 'center',
-  gap: 6,
-},
-
-disabledBtn: {
-  backgroundColor: '#E5E7EB',
-},
-
-createText: {
-  fontSize: 15,
-  fontWeight: '600',
-  color: '#fff',
-},
 memberRow: {
   flexDirection: 'row',
   alignItems: 'center',
