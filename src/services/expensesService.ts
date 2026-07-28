@@ -18,13 +18,7 @@ const parseResponse = async (res: Response) => {
 };
 
 const unwrapList = (body: any): any[] => {
-  if (Array.isArray(body)) { return body; }
-  if (Array.isArray(body?.data)) { return body.data; }
-  if (Array.isArray(body?.data?.expenses)) { return body.data.expenses; }
-  if (Array.isArray(body?.data?.items)) { return body.data.items; }
-  if (Array.isArray(body?.expenses)) { return body.expenses; }
-  if (Array.isArray(body?.items)) { return body.items; }
-  return [];
+  return Array.isArray(body) ? body : [];
 };
 
 export const expensesService = {
