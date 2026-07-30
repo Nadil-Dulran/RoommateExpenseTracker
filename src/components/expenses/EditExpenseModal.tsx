@@ -29,6 +29,7 @@ type Props = {
   participants: Participant[];
   exactSplits: Record<string, string>;
   percentageSplits: Record<string, string>;
+  isAmountLocked: boolean;
   saving: boolean;
   onDescriptionChange: (value: string) => void;
   onAmountChange: (value: string) => void;
@@ -55,6 +56,7 @@ export default function EditExpenseModal({
   participants,
   exactSplits,
   percentageSplits,
+  isAmountLocked,
   saving,
   onDescriptionChange,
   onAmountChange,
@@ -92,15 +94,21 @@ export default function EditExpenseModal({
             <TextInput value={description} onChangeText={onDescriptionChange} style={styles.input} />
 
             <Text style={styles.label}>Amount</Text>
-            <View style={styles.amountContainer}>
+            <View style={[styles.amountContainer, isAmountLocked && styles.lockedAmountContainer]}>
               <Text style={styles.currency}>{currencySymbol}</Text>
               <TextInput
                 value={amount}
                 onChangeText={onAmountChange}
                 keyboardType="decimal-pad"
+                editable={!isAmountLocked}
                 style={styles.amountInput}
               />
             </View>
+            {isAmountLocked && (
+              <Text style={styles.lockedAmountHint}>
+                Amount cannot be changed after expense is settled.
+              </Text>
+            )}
 
             <Text style={styles.label}>Split</Text>
             <View style={styles.toggleRow}>
@@ -217,8 +225,10 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '600', color: '#344054', marginTop: 18, marginBottom: 8 },
   input: { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16, padding: 14, fontSize: 15 },
   amountContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16, paddingHorizontal: 14 },
+  lockedAmountContainer: { backgroundColor: '#F2F4F7', borderColor: '#D0D5DD' },
   currency: { marginRight: 6, fontSize: 16 },
   amountInput: { flex: 1, paddingVertical: 12, fontSize: 15 },
+  lockedAmountHint: { marginTop: 6, fontSize: 12, color: '#667085' },
   toggleRow: { flexDirection: 'row', gap: 10, marginTop: 6 },
   toggle: { flex: 1, paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center' },
   activeToggle: { backgroundColor: '#E6F4EC', borderColor: '#009966' },
