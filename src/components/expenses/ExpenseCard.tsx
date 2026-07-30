@@ -26,7 +26,7 @@ type Props = {
   setActiveMenuId: (id: string | null) => void;
   navigation: any;
   formatCurrency: (amount: number) => string;
-  onEdit: (expense: Expense) => void;
+  onEdit: (expense: Expense, isSettled: boolean) => void;
   onDelete: (expense: Expense) => void;
 };
 
@@ -343,7 +343,7 @@ export default function ExpenseCard({
            )}
 
           <Pressable
-            onPress={() => onEdit(expense)}
+            onPress={() => onEdit(expense, isSettledWithCounterparty)}
             style={styles.menuItem}
           >
             <View style={styles.menuRowItem}>
