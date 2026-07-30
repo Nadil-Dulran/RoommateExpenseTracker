@@ -10,12 +10,10 @@ export const ensureDateValue = (value: any): string | undefined => {
   if (!value) {
     return undefined;
   }
-
   const timestamp = Date.parse(String(value));
   if (!Number.isFinite(timestamp)) {
     return undefined;
   }
-
   return new Date(timestamp).toISOString();
 };
 
@@ -52,12 +50,10 @@ export const compareTimelineEntries = (a: TimelineEntry, b: TimelineEntry) => {
   if (timeDiff !== 0) {
     return timeDiff;
   }
-
   const idDiff = b.orderId - a.orderId;
   if (idDiff !== 0) {
     return idDiff;
   }
-
   return b.id.localeCompare(a.id);
 };
 
@@ -65,25 +61,18 @@ export const extractMembersPayload = (data: any): any[] => {
   if (Array.isArray(data)) {
     return data;
   }
-
   if (Array.isArray(data?.data)) {
     return data.data;
   }
-
   if (Array.isArray(data?.members)) {
     return data.members;
   }
-
   return [];
 };
 
 export const normalizeMember = (member: any): GroupMember => ({
-  id: String(member?.id ?? member?.user_id ?? member?.userId ?? ''),
-  name:
-    member?.name ??
-    member?.user?.name ??
-    member?.full_name ??
-    'Member',
+  id: String(member?.id ??  ''),
+  name: member?.name ?? 'Member',
 });
 
 export const normalizeGroupInfo = (group: any): BackendGroup => ({
