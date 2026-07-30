@@ -1,14 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity,
   ActivityIndicator,
   ImageSourcePropType,
 } from 'react-native';
-import { CommonActions, CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
+import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -178,28 +173,6 @@ export default function DashboardScreen() {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
-  const redirectToSignIn = useCallback(async () => {
-    await Promise.all([
-      AsyncStorage.removeItem('token'),
-      AsyncStorage.removeItem('userId'),
-      AsyncStorage.removeItem('user_id'),
-    ]);
-
-    const parentNavigation = navigation.getParent();
-
-    if (parentNavigation) {
-      parentNavigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'Login' as never }],
-        })
-      );
-      return;
-    }
-
-    navigation.navigate('Login');
-  }, [navigation]);
-
   const toImageUri = (value?: string | null) => {
     if (!value) {
       return null;
@@ -311,20 +284,12 @@ export default function DashboardScreen() {
       const data = await dashboardService.getDashboard();
       setDashboard(normalizeDashboardData(data));
     } catch (error) {
-      if (
-        error instanceof Error &&
-        (error.message === 'Session expired' || error.message === 'No auth token found')
-      ) {
-        await redirectToSignIn();
-        return;
-      }
-
       setDashboard(null);
       setErrorMessage(error instanceof Error ? error.message : 'Failed to load dashboard');
     } finally {
       setIsLoading(false);
     }
-  }, [redirectToSignIn]);
+  }, []);
 
   const loadAllDashboardData = useCallback(async () => {
     await Promise.allSettled([
@@ -526,7 +491,6 @@ export default function DashboardScreen() {
           style={styles.settleButton}
           onPress={() => navigation.navigate('SettleUp', { mode: 'all' })}
         >
-          <Icon name="dollar-sign" size={18} color="#007a55" />
           <Text style={styles.settleText}>Settle All Debts</Text>
         </TouchableOpacity>
 
@@ -556,27 +520,28 @@ export default function DashboardScreen() {
               </View>
 
               <View style={{ alignItems: 'flex-end' }}>
-                <Text
-                  style={[
-                    styles.balanceType,
-                    {
-                      color: balance.isYouOwing ? '#ff2056' : '#009966',
-                    },
-                  ]}
-                >
-                  {balance.isYouOwing ? 'you owe' : 'owes you'}
-                </Text>
-
-                <Text
-                  style={[
-                    styles.groupAmount,
-                    {
-                      color: balance.isYouOwing ? '#ff2056' : '#009966',
-                    },
-                  ]}
-                >
-                  {formatCurrency(balance.amount)}
-                </Text>
+                {balance.amount === 0 ? (
+                  <Text style={[styles.groupAmount, { color: '#009966' }]}>Settled</Text>
+                ) : (
+                  <>
+                    <Text
+                      style={[
+                        styles.balanceType,
+                        { color: balance.isYouOwing ? '#ff2056' : '#009966' },
+                      ]}
+                    >
+                      {balance.isYouOwing ? 'you owe' : 'owes you'}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.groupAmount,
+                        { color: balance.isYouOwing ? '#ff2056' : '#009966' },
+                      ]}
+                    >
+                      {formatCurrency(balance.amount)}
+                    </Text>
+                  </>
+                )}
               </View>
             </TouchableOpacity>
           );

@@ -7,9 +7,6 @@ const parseJson = async (response: Response) => {
   return response.json().catch(() => null);
 };
 
-const isAuthError = (response: Response) => response.status === 401 || response.status === 403;
-
-
 export const dashboardService = {
 
   async getDashboard() {
@@ -29,10 +26,6 @@ export const dashboardService = {
     const body = await parseJson(response);
 
     if (!response.ok) {
-      if (isAuthError(response)) {
-        throw new Error('Session expired');
-      }
-
       throw new Error(body?.message || 'Failed to load dashboard');
     }
 
