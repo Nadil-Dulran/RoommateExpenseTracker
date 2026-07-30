@@ -56,6 +56,7 @@ export default function ExpensesScreen() {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isEditingSettledExpense, setIsEditingSettledExpense] = useState(false);
 
   const [editDescription, setEditDescription] = useState('');
   const [editAmount, setEditAmount] = useState('');
@@ -79,9 +80,10 @@ export default function ExpensesScreen() {
 
 
 
-const handleEdit = (item: Expense) => {
+const handleEdit = (item: Expense, isSettled: boolean) => {
   setActiveMenuId(null);
   setSelectedExpense(item);
+  setIsEditingSettledExpense(isSettled);
   setEditDescription(item.description);
   setEditAmount(item.amount.toString());
   setShowEditModal(true);
@@ -444,6 +446,7 @@ const loadExpenses = useCallback(async () => {
   const dismissEditModal = () => {
     setShowEditModal(false);
     setSelectedExpense(null);
+    setIsEditingSettledExpense(false);
     setActiveMenuId(null);
   };
 
@@ -734,6 +737,7 @@ const loadExpenses = useCallback(async () => {
         participants={editParticipants}
         exactSplits={editExactSplits}
         percentageSplits={editPercentageSplits}
+        isAmountLocked={isEditingSettledExpense}
         saving={isSavingEdit}
         onDescriptionChange={setEditDescription}
         onAmountChange={setEditAmount}
