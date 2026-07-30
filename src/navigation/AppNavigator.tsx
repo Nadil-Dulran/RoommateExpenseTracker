@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, View } from 'react-native';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import  Login  from "../screens/authentication/LoginScreen";
@@ -13,20 +13,75 @@ import { RootStackParamList } from '../types/navigation';
 import GroupDetailsScreen from '../screens/external/GroupDetailsScreen';
 import JoinGroupScreen from '../screens/external/JoinGroupScreen';
 import ProfileSettings from '../screens/profile/ProfileSettings';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearSession, getSessionExpiryTime, isSessionExpired } from '../utils/auth';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const AUTH_ROUTES: string[] = ['Login', 'Signup', 'ForgotPassword'];
 
 const AppNavigator = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [initialRoute, setInitialRoute] = useState<keyof RootStackParamList>('Login');
+    const navigationRef = useNavigationContainerRef<RootStackParamList>();
+    const expiryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const checkTokenRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const insets = useSafeAreaInsets();
 
+    const clearExpiryTimer = useCallback(() => {
+      if (expiryTimer.current) {
+        clearTimeout(expiryTimer.current);
+        expiryTimer.current = null;
+      }
+    }, []);
+
+    const signOutExpiredUser = useCallback(async () => {
+      clearExpiryTimer();
+      await clearSession();
+
+      if (!navigationRef.isReady()) {
+        return;
+      }
+
+      const currentRoute = navigationRef.getCurrentRoute()?.name;
+      if (currentRoute && !AUTH_ROUTES.includes(currentRoute)) {
+        navigationRef.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      }
+    }, [clearExpiryTimer, navigationRef]);
+
+    const checkToken = useCallback(async () => {
+      if (await isSessionExpired()) {
+        await signOutExpiredUser();
+        return;
+      }
+
+      const expiryTime = await getSessionExpiryTime();
+      if (!expiryTime) {
+        await signOutExpiredUser();
+        return;
+      }
+
+      clearExpiryTimer();
+      expiryTimer.current = setTimeout(() => {
+        void checkTokenRef.current();
+      }, Math.max(expiryTime - Date.now(), 0));
+    }, [clearExpiryTimer, signOutExpiredUser]);
+
     useEffect(() => {
-      const checkToken = async () => {
+      checkTokenRef.current = checkToken;
+    }, [checkToken]);
+
+    useEffect(() => {
+      const bootstrapSession = async () => {
         try {
-          const token = await AsyncStorage.getItem('token');
-          setInitialRoute(token ? 'MainTabs' : 'Login');
+          const sessionExpired = await isSessionExpired();
+          if (sessionExpired) {
+            await clearSession();
+            setInitialRoute('Login');
+          } else {
+            setInitialRoute('MainTabs');
+          }
         } catch (error) {
           setInitialRoute('Login');
         } finally {
@@ -34,8 +89,20 @@ const AppNavigator = () => {
         }
       };
 
-      checkToken();
-    }, []);
+      void bootstrapSession();
+      void checkToken();
+
+      const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+        if (nextAppState === 'active') {
+          void checkToken();
+        }
+      });
+
+      return () => {
+        clearExpiryTimer();
+        appStateSubscription.remove();
+      };
+    }, [checkToken, clearExpiryTimer]);
 
     const linking = {
     prefixes: ['roommate://'],
@@ -63,7 +130,13 @@ const AppNavigator = () => {
     }
 
     return (
-      <NavigationContainer linking={linking}>
+      <NavigationContainer
+        linking={linking}
+        ref={navigationRef}
+        onStateChange={() => {
+          void checkToken();
+        }}
+      >
         <Stack.Navigator
           initialRouteName={initialRoute}
           screenOptions={{
