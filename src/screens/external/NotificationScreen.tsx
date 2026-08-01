@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { Notification } from '../../types/notification';
@@ -22,7 +15,6 @@ const toImageUri = (value?: string | null, mimeType = 'image/jpeg') => {
   if (!normalized) {
     return null;
   }
-
   if (
     normalized.startsWith('http://') ||
     normalized.startsWith('https://') ||
@@ -86,65 +78,6 @@ const NotificationsScreen = () => {
     return undefined;
   };
 
-  const getSettlementSummary = (item: Notification) => {
-    if (item.type !== 'expense_settled') {
-      return null;
-    }
-
-    const data = item.data ?? {};
-    const notes = stripExpenseTag(
-      data.settlement?.description ??
-      data.settlementDescription ??
-      data.expense?.description ??
-      data.expenseDescription ??
-      data.description ??
-      ''
-    );
-
-    const method = String(
-      data.settlement?.method ??
-      data.method ??
-      data.settlementMethod ??
-      ''
-    ).trim();
-
-    const payerName = String(
-      data.settlement?.payerName ??
-      data.payerName ??
-      data.fromUser?.name ??
-      data.fromName ??
-      item.relatedUser?.name ??
-      ''
-    ).trim();
-
-    const receiverName = String(
-      data.settlement?.receiverName ??
-      data.receiverName ??
-      data.toUser?.name ??
-      data.toName ??
-      ''
-    ).trim();
-
-    const pieces: string[] = [];
-
-    if (notes) {
-      pieces.push(notes);
-    }
-
-    if (payerName && receiverName) {
-      pieces.push(`${payerName} → ${receiverName}`);
-    } else if (payerName) {
-      pieces.push(`By ${payerName}`);
-    }
-
-    if (method) {
-      pieces.push(method.toUpperCase());
-    }
-
-    const summary = pieces.join(' • ').trim();
-    return summary || null;
-  };
-
   const renderItem = ({ item }: { item: Notification }) => {
     
 
@@ -168,10 +101,7 @@ const NotificationsScreen = () => {
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => markAsRead(item.id)}
-        style={[
-          styles.card,
-          !item.read && styles.unreadCard,
-        ]}
+        style={[ styles.card, !item.read && styles.unreadCard, ]}
       >
         <View style={styles.row}>
           <View style={styles.avatarContainer}>
@@ -183,20 +113,13 @@ const NotificationsScreen = () => {
             <View
               style={[
                 styles.badge,
-                {
-                  backgroundColor:
-                    item.type === 'expense_added'
-                      ? '#009966'
-                      : '#10B981',
+                { backgroundColor: item.type === 'expense_added'
+                      ? '#009966' : '#10B981',
                 },
               ]}
             >
               <Icon
-                name={
-                  item.type === 'expense_added'
-                    ? 'dollar-sign'
-                    : 'check-circle'
-                }
+                name={ item.type === 'expense_added' ? 'dollar-sign' : 'check-circle' }
                 size={13}
                 color="#fff"
               />
@@ -231,18 +154,13 @@ const NotificationsScreen = () => {
 
             {shareAmount != null && (
               <View
-                style={[
-                  styles.amountPill,
-                  item.type === 'expense_settled' && styles.settledPill,
-                ]}
+                style={[ styles.amountPill,
+                  item.type === 'expense_settled' && styles.settledPill, ]}
               >
                 
-
                 <Text
-                  style={[
-                    styles.amountText,
-                    item.type === 'expense_settled' && styles.settledText,
-                  ]}
+                  style={[ styles.amountText,
+                    item.type === 'expense_settled' && styles.settledText, ]}
                 >
                  <Text>Amount: </Text> {formatCurrency(shareAmount)}
                 </Text>
