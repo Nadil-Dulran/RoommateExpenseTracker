@@ -1,21 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  Modal,
-  TextInput,
-  Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal, TextInput, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
-
 import { RootStackParamList } from '../../types/navigation';
 import { Expense, User, Settlement } from '../../types';
 import { groupsService } from '../../services/groupsService';
@@ -26,6 +15,7 @@ import { calculateGroupBalance } from '../../utils/balance';
 import { extractExpensesPayload, normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses';
 import { extractSettlementsPayload, normalizeSettlement } from '../../utils/settlements';
 import { useAppCurrency } from '../../context/CurrencyContext';
+import { CATEGORY_EMOJI_BY_TYPE } from '../../constants/emojis';
 
 type RouteProps = RouteProp<RootStackParamList, 'GroupDetails'>;
 type NavProps = NativeStackNavigationProp<RootStackParamList>;
@@ -64,38 +54,11 @@ export default function GroupDetailsScreen() {
   const [memberToRemove, setMemberToRemove] = useState<User | null>(null);
 
   const extractCreatorId = useCallback((rawGroup: any) => {
-    return String(
-      rawGroup?.creatorId ??
-      rawGroup?.creator_id ??
-      rawGroup?.createdBy ??
-      rawGroup?.created_by ??
-      rawGroup?.ownerId ??
-      rawGroup?.owner_id ??
-      rawGroup?.owner?.id ??
-      rawGroup?.creator?.id ??
-      ''
-    );
+    return String( rawGroup?.creatorId ?? rawGroup?.created_by ?? '' );
   }, []);
 
   const roundCurrency = (value: number) => {
     return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-  };
-
-  const getCategoryIcon = (value: unknown) => {
-    const normalized = String(value ?? 'other').trim().toLowerCase();
-    const iconMap: Record<string, string> = {
-      food: '🍔',
-      shopping: '🛍️',
-      entertainment: '🎬',
-      work: '💼',
-      rent: '🏠',
-      transport: '🚗',
-      grocery: '🛒',
-      bills: '🧾',
-      other: '📌',
-    };
-
-    return iconMap[normalized] ?? '📦';
   };
 
   const toImageUri = (value?: string | null, mimeType?: string | null) => {
@@ -108,11 +71,9 @@ export default function GroupDetailsScreen() {
     if (!normalizedValue) {
       return null;
     }
-
     if (normalizedValue.startsWith('http://') || normalizedValue.startsWith('https://')) {
       return normalizedValue;
     }
-
     if (normalizedValue.startsWith('data:image')) {
       return normalizedValue;
     }
@@ -126,27 +87,12 @@ export default function GroupDetailsScreen() {
   const normalizeMembers = useCallback((membersRaw: any[]) => {
     return (membersRaw || []).map((member: any, index: number) => {
       return {
-        id: String(
-          member?.id ??
-          member?.user_id ??
-          member?.userId ??
-          member?.user?.id ??
-          `member-${index}`
-        ),
-        name:
-          member?.name ??
-          member?.user?.name ??
-          member?.full_name ??
-          'Member',
-        avatar: toImageUri(
-          member?.avatarBase64 ?? member?.avatar_base64 ?? member?.avatar,
-          member?.avatarMimeType ?? member?.avatar_mime_type ?? null
-        )
+        id: String( member?.id ?? `member-${index}` ),
+        name: member?.name ?? 'Member',
+        avatar: toImageUri( member?.avatarBase64 ??  null )
       };
     });
   }, []);
-
-  
 
   const loadCurrentUserId = useCallback(async () => {
     try {
@@ -193,15 +139,12 @@ export default function GroupDetailsScreen() {
     if (Array.isArray(data)) {
       return data;
     }
-
     if (Array.isArray(data?.data)) {
       return data.data;
     }
-
     if (Array.isArray(data?.members)) {
       return data.members;
     }
-
     return [];
   };
 
@@ -234,7 +177,6 @@ export default function GroupDetailsScreen() {
           rawExpenses = [];
         }
       }
-
       if (rawExpenses.length === 0) {
         const allExpenses = extractExpensesPayload(await expensesService.getExpenses());
         rawExpenses = allExpenses.filter(item =>
@@ -243,9 +185,8 @@ export default function GroupDetailsScreen() {
       }
 
       const normalized = sortRawExpensesByLatest(rawExpenses)
-        .map(exp => normalizeExpense(exp, group?.id ?? id))
+        .map(exp => normalizeExpense(exp))
         .filter((expense: Expense) => !!expense.id);
-
       setGroupExpenses(normalized);
     } catch (error) {
       console.log('Failed to load group expenses', error);
@@ -260,7 +201,6 @@ export default function GroupDetailsScreen() {
       setSettlements([]);
       return;
     }
-
     try {
       const response = await settlementService.getSettlements(targetGroupId);
       const normalized = extractSettlementsPayload(response)
@@ -325,7 +265,6 @@ export default function GroupDetailsScreen() {
       Alert.alert('Not allowed', 'Only the group creator can delete this group.');
       return;
     }
-
     try {
       await groupsService.deleteGroup(group?.id ?? id);
       setShowDeleteModal(false);
@@ -345,7 +284,6 @@ export default function GroupDetailsScreen() {
       Alert.alert('Leave failed', 'Could not resolve current user.');
       return;
     }
-
     try {
       await groupMembersService.removeMember(group?.id ?? id, resolvedCurrentUserId);
       setShowLeaveModal(false);
@@ -366,10 +304,6 @@ export default function GroupDetailsScreen() {
     return !!creatorId && !!currentUserId && String(creatorId) === String(currentUserId);
   }, [creatorId, currentUserId]);
 
-  // ---------------------------
-  // BALANCE CALCULATIONS (moved before early return to respect React hooks rules)
-  // ---------------------------
-
   const groupBalance = useMemo(() => {
     const base = calculateGroupBalance(groupExpenses, currentUserId);
     const me = String(currentUserId || '');
@@ -377,7 +311,6 @@ export default function GroupDetailsScreen() {
     if (!me) {
       return base;
     }
-
     let signedBalance = base.isYouOwing ? -Number(base.amount || 0) : Number(base.amount || 0);
 
     settlements.forEach(settlement => {
@@ -428,7 +361,6 @@ export default function GroupDetailsScreen() {
               amount: (existing?.amount ?? 0) + Number(split.amount || 0),
             });
           });
-
           return;
         }
 
@@ -509,7 +441,6 @@ export default function GroupDetailsScreen() {
         amount: othersOwe,
       };
     }
-
     return {
       type: 'owing' as const,
       amount: Number(mySplit.amount || 0),
@@ -532,9 +463,6 @@ export default function GroupDetailsScreen() {
     }, 2000);
   }, [group.id]);
 
-  // ---------------------------
-  // UI
-  // ---------------------------
 
   if (!group) {
     return (
@@ -553,7 +481,6 @@ const renderAvatar = (avatar?: string | any) => {
     ? { uri: avatar }
     : avatar;
 };
-
 
   return (
     <View style={styles.container}>
@@ -626,7 +553,6 @@ const renderAvatar = (avatar?: string | any) => {
 )}
       
       {/* Edit Modal */}
-
 <Modal
   visible={showEditModal}
   transparent
@@ -1038,7 +964,6 @@ const renderAvatar = (avatar?: string | any) => {
                   members: (prev?.members || []).filter((m: any) => m.id !== memberToRemove.id),
                 }));
               }
-
               setShowRemoveModal(false);
               setMemberToRemove(null);
             } catch (error) {
@@ -1078,7 +1003,7 @@ const renderAvatar = (avatar?: string | any) => {
   .filter(expense => String(expense.description || '').trim().toLowerCase() !== 'settlement')
   .slice(0, 3)
   .map(expense => {
-  const categoryIcon = getCategoryIcon(expense.category);
+  const categoryIcon = CATEGORY_EMOJI_BY_TYPE[expense.category] ?? CATEGORY_EMOJI_BY_TYPE.other;
   const share = calculateUserShareFromSplits(expense);
   const expenseTitle = String(expense.description ?? 'Expense').trim();
   const expenseTitleWords = expenseTitle.split(/\s+/).filter(Boolean);
