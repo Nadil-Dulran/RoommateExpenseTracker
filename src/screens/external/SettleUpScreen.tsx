@@ -1,19 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet,
+  ActivityIndicator, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Feather';
-
 import { RootStackParamList, SettleUpExpenseContext } from '../../types/navigation';
 import { Expense, Settlement } from '../../types';
 import { expensesService } from '../../services/expensesService';
@@ -21,10 +12,9 @@ import { groupsService } from '../../services/groupsService';
 import { groupMembersService } from '../../services/groupMembersService';
 import { settlementService } from '../../services/settlementService';
 import { dashboardService } from '../../services/dashboardService';
-import {
-  extractSettlementsPayload,
-  normalizeSettlement,
-} from '../../utils/settlements';
+import { extractSettlementsPayload, normalizeSettlement } from '../../utils/settlements';
+import { normalizeExpense } from '../../utils/expenses';
+import { extractMembersPayload, normalizeMember, roundCurrency } from '../../utils/activity';
 import { useAppCurrency } from '../../context/CurrencyContext';
 
 type RouteProps = RouteProp<RootStackParamList, 'SettleUp'>;
@@ -43,137 +33,18 @@ type GroupMember = {
   name: string;
 };
 
-const roundCurrency = (value: number) => {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-};
-
-const extractMembersPayload = (data: any): any[] => {
-  if (Array.isArray(data)) {
-    return data;
-  }
-
-  if (Array.isArray(data?.data)) {
-    return data.data;
-  }
-
-  if (Array.isArray(data?.members)) {
-    return data.members;
-  }
-
-  return [];
-};
-
 const extractGroupsPayload = (data: any): any[] => {
   if (Array.isArray(data)) {
     return data;
   }
-
   if (Array.isArray(data?.data)) {
     return data.data;
   }
-
   if (Array.isArray(data?.groups)) {
     return data.groups;
   }
 
   return [];
-};
-
-const normalizeMember = (member: any): GroupMember => ({
-  id: String(
-    member?.id ??
-      member?.user_id ??
-      member?.userId ??
-      member?.user?.id ??
-      ''
-  ),
-  name:
-    member?.name ??
-    member?.user_name ??
-    member?.username ??
-    member?.user?.name ??
-    'Member',
-});
-
-const normalizeExpense = (raw: any): Expense => {
-  const getSplitUserId = (split: any) => {
-    return String(
-        split.userId ??
-        split.user_id ??
-        split.memberId ??
-        split.member_id ??
-        split.user?.id ??
-        ''
-    );
-  };
-
-  const getSplitAmount = (split: any) => {
-    return Number(
-      split.share_amount ??
-        split.amount ??
-        split.shareAmount ??
-        split.share ??
-        0
-    );
-  };
-
-  const splitsRaw = Array.isArray(raw?.splits)
-    ? raw.splits
-    : Array.isArray(raw?.expenseSplits)
-    ? raw.expenseSplits
-    : Array.isArray(raw?.expense_splits)
-    ? raw.expense_splits
-    : Array.isArray(raw?.splitDetails)
-    ? raw.splitDetails
-    : Array.isArray(raw?.split_details)
-    ? raw.split_details
-    : [];
-
-  const paidById = String(
-      raw.paidByUser?.id ??
-      raw.paid_by_user?.id ??
-      raw.paidBy?.id ??
-      raw.paidById ??
-      raw.paid_by ??
-      raw.paid_by_id ??
-      raw.userId ??
-      ''
-  );
-
-  return {
-    id: String(raw?.id ?? raw?.expenseId ?? raw?.expense_id ?? ''),
-    category: String(raw?.category ?? raw?.type ?? 'other').toLowerCase() as Expense['category'],
-    description: raw?.description ?? raw?.title ?? 'Expense',
-    amount: Number(raw?.amount ?? raw?.total ?? raw?.expense_amount ?? 0),
-    date: String(
-      raw?.date ??
-        raw?.expense_date ??
-        raw?.createdAt ??
-        raw?.created_at ??
-        new Date().toISOString()
-    ),
-    groupId: String(raw?.groupId ?? raw?.group_id ?? raw?.group?.id ?? ''),
-    paidBy: {
-      id: paidById,
-      name:
-        raw?.paidByUser?.name ??
-        raw?.paid_by_user?.name ??
-        raw?.paidBy?.name ??
-        raw?.paid_by_name ??
-        raw?.paidByName ??
-        raw?.user?.name ??
-        'Unknown',
-    },
-    splits: splitsRaw
-      .map((split: any) => ({
-        userId: getSplitUserId(split),
-        amount: getSplitAmount(split),
-      }))
-      .filter(
-        (split: { userId: string; amount: number }) =>
-          !!split.userId && Number.isFinite(split.amount) && split.amount > 0
-      ),
-  };
 };
 
 export default function SettleUpScreen() {
@@ -1193,7 +1064,6 @@ const styles = StyleSheet.create({
 
   modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
   modalDesc: { fontSize: 14, marginBottom: 20 },
-
   modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
 
   cancelBtn: {
