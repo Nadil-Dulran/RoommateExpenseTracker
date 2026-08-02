@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  BackHandler,
-  Modal,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, BackHandler, Modal } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,17 +8,16 @@ import logoIcon from '../../../assets/Logo.png';
 import { authService } from '../../services/authService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { styles } from './styles/Auth.styles';
 
 export default function LoginScreen() {
   const navigation = useNavigation<any>();
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [showContactSupportModal, setShowContactSupportModal] = useState(false);
   const [emailCopied, setEmailCopied] = useState(false);
-  
 
   // Handle back button to exit app on login screen
   useFocusEffect(
@@ -114,7 +105,6 @@ export default function LoginScreen() {
 
 const handleCopyEmail = async () => {
   try {
-    // In React Native, use a clipboard library or implement copy functionality
     setEmailCopied(true);
     setTimeout(() => setEmailCopied(false), 2000);
   } catch (error) {
@@ -275,246 +265,3 @@ const handleCopyEmail = async () => {
     </TouchableWithoutFeedback>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 20,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  logo: {
-    width: 65,
-    height: 65,
-    backgroundColor: '#009966',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  logoText: {
-    fontSize: 28,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#101828',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6a7282',
-    marginTop: 4,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 1,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#676767',
-    marginBottom: 6,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    height: 50,
-  },
-  input: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#101828',
-  },
-  error: {
-    color: '#ff2056',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  forgot: {
-    alignSelf: 'flex-end',
-    marginTop: 10,
-  },
-  forgotText: {
-    color: '#009966',
-    fontWeight: '600',
-    fontSize: 13,
-    fontFamily: 'Inter',
-  },
-  button: {
-    backgroundColor: '#009966',
-    marginTop: 20,
-    height: 50,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  helpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 1,
-    marginTop: 10,
-    marginBottom: 25,
-  },
-  contactLink: {
-    color: '#009966',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  signupContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 25,
-  },
-  signupText: {
-    color: '#009966',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-    divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-    line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
-    orText: {
-    marginHorizontal: 12,
-    color: '#9CA3AF',
-    fontSize: 12,
-  },
-    socialButton: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 14,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  socialText: {
-    color: '#111827',
-    fontWeight: '500',
-  },
-  socialIcon: {
-  width: 20,
-  height: 20,
-  marginRight: 10,
-},
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    minHeight: 300,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-    position: 'relative',
-  },
-  supportIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F0F9F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#101828',
-    marginBottom: 8,
-  },
-  closeButton: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    padding: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#6a7282',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  supportInfoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-  },
-  supportInfoText: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  supportLabel: {
-    fontSize: 12,
-    color: '#6a7282',
-    marginBottom: 4,
-  },
-  supportValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#101828',
-  },
-  copyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-  },
-  copiedText: {
-    fontSize: 12,
-    color: '#009966',
-    fontWeight: '600',
-    marginLeft: 6,
-  },
-  modalPrimaryButton: {
-    backgroundColor: '#009966',
-    borderRadius: 12,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-});
-
