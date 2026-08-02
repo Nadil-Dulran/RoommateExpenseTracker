@@ -1,13 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Clipboard,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, Clipboard } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { Image } from 'react-native';
@@ -15,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import logoIcon from '../../../assets/Logo.png';
 import { authService } from '../../services/authService';
 import { Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { styles } from './styles/Auth.styles';
 
 export default function ForgotPasswordScreen() {
   const navigation = useNavigation<any>();
@@ -36,7 +29,6 @@ export default function ForgotPasswordScreen() {
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
   const [resetSuccess, setResetSuccess] = useState(false);
   const [resendDisabled, setResendDisabled] = useState(false);
   const [resendCountdown, setResendCountdown] = useState<number>(0);
@@ -157,7 +149,7 @@ export default function ForgotPasswordScreen() {
             </View>
 
             <Text style={styles.title}>Forgot Password?</Text>
-            <Text style={styles.subtitle}>
+            <Text style={styles.subtitleF}>
               No worries, we'll send you a password reset code
             </Text>
           </View>
@@ -190,23 +182,21 @@ export default function ForgotPasswordScreen() {
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
               <TouchableOpacity
-                style={styles.primaryButton}
+                style={styles.primaryButtonF}
                 onPress={handleSendCode}
               >
                 <Text style={styles.primaryButtonText}>
                   Send Password Reset Code
                 </Text>
               </TouchableOpacity>
-
-              
             </>
           )}
 
           {stage === 'verify' && (
             <>
               <Text style={styles.title}>Enter Verification Code</Text>
-              <Text style={styles.subtitle}>
-                We've sent a 6-digit code to {email}
+              <Text style={styles.subtitleF}>
+                We've sent a six digit code to your email.
               </Text>
 
               <View
@@ -234,7 +224,7 @@ export default function ForgotPasswordScreen() {
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
               <TouchableOpacity
-                style={styles.primaryButton}
+                style={styles.primaryButtonF}
                 onPress={handleVerifyCode}
               >
                 <Text style={styles.primaryButtonText}>Verify Code</Text>
@@ -291,7 +281,7 @@ export default function ForgotPasswordScreen() {
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
               <TouchableOpacity
-                style={styles.primaryButton}
+                style={styles.primaryButtonF}
                 onPress={handleSavePassword}
               >
                 <Text style={styles.primaryButtonText}>Save Password</Text>
@@ -315,7 +305,6 @@ export default function ForgotPasswordScreen() {
             <Text style={styles.contactLink}> Contact Support</Text>
           </TouchableOpacity>
         </View>
-
       </View>
 
         <TouchableOpacity
@@ -335,7 +324,7 @@ export default function ForgotPasswordScreen() {
           onRequestClose={() => setShowContactSupportModal(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+            <View style={styles.modalContentF}>
               {/* Modal Header */}
               <View style={styles.modalHeader}>
                 <View style={styles.supportIconCircle}>
@@ -386,264 +375,3 @@ export default function ForgotPasswordScreen() {
    </TouchableWithoutFeedback>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 20
-  },
-  pageContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  scroll: {
-    flex: 1,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  logo: {
-    width: 65,
-    height: 65,
-    backgroundColor: '#009966',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#101828',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#6a7282',
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 1,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#676767',
-    marginBottom: 6,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    height: 50,
-  },
-  input: {
-    flex: 1,
-    marginLeft: 8,
-    color: '#111827',
-  },
-  errorBorder: {
-    borderColor: '#ff2056',
-  },
-  errorText: {
-    color: '#ff2056',
-    fontSize: 12,
-    marginTop: 6,
-  },
-  primaryButton: {
-    backgroundColor: '#009966',
-    borderRadius: 14,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 14,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  secondaryButtonText: {
-    color: '#101828',
-    fontWeight: '500',
-  },
-  emailBox: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    padding: 12,
-    marginVertical: 16,
-  },
-  emailText: {
-    fontWeight: '600',
-    color: '#101828',
-    textAlign: 'center',
-  },
-  helperText: {
-    fontSize: 13,
-    color: '#6a7282',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  successCircle: {
-    width: 70,
-    height: 70,
-    backgroundColor: '#ECFDF5',
-    borderRadius: 35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  helpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 1,
-    marginTop: 10,
-  },
-  contactLink: {
-    color: '#009966',
-    fontWeight: '500',
-    fontSize: 13,
-  },
-  successTitle: {
-  fontSize: 22,
-  fontWeight: '700',
-  color: '#101828',
-  textAlign: 'center',
-  marginBottom: 8,
-},
-  goToSignInButton: {
-    alignSelf: 'center',
-  },
-  goToSignInAccent: {
-    color: '#009966',
-    fontWeight: '600',
-  },
-  successMessage: {
-    fontSize: 14,
-    color: '#009966',
-    textAlign: 'center',
-    marginTop: 12,
-    fontWeight: '500',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 32,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-    position: 'relative',
-  },
-  supportIconCircle: {
-    width: 60,
-    height: 60,
-    backgroundColor: '#ECFDF5',
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#101828',
-    marginBottom: 8,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: -10,
-    right: 0,
-    padding: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: '#6a7282',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  supportInfoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 24,
-    borderLeftWidth: 4,
-    borderLeftColor: '#009966',
-  },
-  supportInfoText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  supportLabel: {
-    fontSize: 12,
-    color: '#6a7282',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  supportValue: {
-    fontSize: 16,
-    color: '#101828',
-    fontWeight: '600',
-  },
-  copyButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  copiedText: {
-    fontSize: 10,
-    color: '#009966',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  modalPrimaryButton: {
-    backgroundColor: '#009966',
-    borderRadius: 12,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
