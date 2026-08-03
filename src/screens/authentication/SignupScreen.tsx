@@ -1,14 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  Modal,
-  Clipboard,
+import { View, Text, TextInput, TouchableOpacity, ScrollView,
+  Alert, Modal, Clipboard,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
@@ -17,6 +9,7 @@ import { Image } from 'react-native';
 import logoIcon from '../../../assets/Logo.png';
 import { authService } from '../../services/authService';
 import { DEFAULT_CURRENCY_CODE } from '../../constants/currencies';
+import { styles } from './styles/Auth.styles';
 
 export default function SignupScreen() {
   const navigation = useNavigation<any>();
@@ -129,7 +122,7 @@ export default function SignupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.containerS}>
       <ScrollView contentContainerStyle={[ styles.scroll, { flexGrow: 1, justifyContent: 'center' } ]} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={styles.header}>
@@ -312,15 +305,15 @@ export default function SignupScreen() {
           onRequestClose={() => setShowTermsModal(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+            <View style={styles.modalContentS}>
               {/* Modal Header */}
               <View style={styles.modalHeader}>
                 <View style={styles.documentIconCircle}>
                   <Icon name="file-text" size={24} color="#009966" />
                 </View>
-                <Text style={styles.modalTitle}>Terms of Service & Privacy Policy</Text>
+                <Text style={styles.modalTitleS}>Terms of Service & Privacy Policy</Text>
                 <TouchableOpacity
-                  style={styles.closeButton}
+                  style={styles.closeButtonS}
                   onPress={() => setShowTermsModal(false)}
                 >
                   <Icon name="x" size={24} color="#6a7282" />
@@ -408,270 +401,3 @@ export default function SignupScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  scroll: { padding: 24, flexGrow: 1, justifyContent: 'center'},
-
-  header: { alignItems: 'center', marginBottom: 30 },
-  logo: {
-    width: 65,
-    height: 65,
-    backgroundColor: '#009966',
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: { fontSize: 24, fontWeight: '700', color: '#101828' },
-  subtitle: { fontSize: 14, color: '#6a7282', marginTop: 6 },
-
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    elevation: 1,
-  },
-
-  label: { 
-    fontSize: 13,
-    fontWeight: '500', 
-    color: '#676767', 
-    marginTop: 12 
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    height: 50,
-    marginTop: 6,
-  },
-  input: { flex: 1, marginLeft: 8, fontSize: 14, color: '#101828' },
-  error: { color: '#ff2056', fontSize: 12, marginTop: 4 },
-  errorBorder: { borderColor: '#ff2056' },
-
-  /* Terms Container */
-  termsContainer: {
-    marginTop: 26,
-    alignItems: 'center',
-  },
-  termsText: {
-    fontSize: 13,
-    color: '#6a7282',
-    textAlign: 'center',
-    marginBottom: 10,
-    fontWeight: '500',
-  },
-  termsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F0FAF7',
-    borderWidth: 1.5,
-    borderColor: '#009966',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginBottom: 26,
-  },
-  termsLink: {
-    color: '#009966',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-
-  primaryButton: {
-    backgroundColor: '#009966',
-    height: 50,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  primaryButtonText: { color: '#fff', fontWeight: '600' },
-  statusMessage: {
-    textAlign: 'center',
-    marginTop: 10,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  statusSuccess: { color: '#009966' },
-  statusError: { color: '#ff2056' },
-
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  line: { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
-  or: { marginHorizontal: 10, color: '#9CA3AF', fontSize: 12 },
-
-
-  bottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 25,
-  },
-  socialButton: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 14,
-    height: 52,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  socialText: {
-    color: '#111827',
-    fontWeight: '500',
-  },
-  socialIcon: {
-  width: 20,
-  height: 20,
-  marginRight: 10,
-  },
-  loginLink: { 
-    color: '#009966',
-    fontSize:15, 
-    fontWeight: '600' 
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 20,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-    position: 'relative',
-  },
-  documentIconCircle: {
-    width: 60,
-    height: 60,
-    backgroundColor: '#ECFDF5',
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#101828',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: -10,
-    right: 0,
-    padding: 8,
-  },
-  modalScroll: {
-    maxHeight: 350,
-    marginBottom: 16,
-  },
-  modalBody: {
-    paddingRight: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#101828',
-    marginTop: 16,
-    marginBottom: 12,
-  },
-  policySection: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  policyText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  policyLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#101828',
-    marginBottom: 4,
-  },
-  policyDescription: {
-    fontSize: 13,
-    color: '#6a7282',
-    lineHeight: 18,
-  },
-  supportInfoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#009966',
-  },
-  supportInfoText: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  supportLabel: {
-    fontSize: 12,
-    color: '#6a7282',
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  supportValue: {
-    fontSize: 15,
-    color: '#101828',
-    fontWeight: '600',
-  },
-  copyButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  copiedText: {
-    fontSize: 10,
-    color: '#009966',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  disclaimerText: {
-    fontSize: 12,
-    color: '#6a7282',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginTop: 12,
-    lineHeight: 16,
-  },
-  modalPrimaryButton: {
-    backgroundColor: '#009966',
-    borderRadius: 12,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
