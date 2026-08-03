@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types/navigation';
 import { groupsService } from '../../services/groupsService';
+import { styles } from './styles/External.styles';
 
 type JoinGroupNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 const JOIN_GROUP_RESULT_KEY = '@roommate/join-group-result';
@@ -24,7 +25,6 @@ export default function JoinGroupScreen() {
   const navigation = useNavigation<JoinGroupNavigationProp>();
   const route = useRoute<any>();
   const { groupId, openGroupDetailsOnSuccess } = route.params || {};
-
   const [isJoining, setIsJoining] = useState(false);
   const [statusText, setStatusText] = useState('Preparing group join...');
 
@@ -76,32 +76,10 @@ export default function JoinGroupScreen() {
   }, [groupId, joinGroup]);
 
   return (
-    <View style={styles.container}>
+    <View style={{...styles.container, alignItems: 'center', justifyContent: 'center', padding: 24}}>
       <ActivityIndicator size="large" color="#009966" animating={isJoining} />
-      <Text style={styles.title}>Join Group</Text>
+      <Text style={{...styles.title, marginTop: 16 }}>Join Group</Text>
       <Text style={styles.description}>{statusText}</Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F9FAFB',
-    padding: 24,
-  },
-  title: {
-    marginTop: 16,
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#101828',
-  },
-  description: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#6A7282',
-    textAlign: 'center',
-  },
-});

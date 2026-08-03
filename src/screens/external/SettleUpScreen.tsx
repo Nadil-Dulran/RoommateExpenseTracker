@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal, StyleSheet,
-  ActivityIndicator, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, ActivityIndicator, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +15,7 @@ import { extractSettlementsPayload, normalizeSettlement } from '../../utils/sett
 import { normalizeExpense } from '../../utils/expenses';
 import { extractMembersPayload, normalizeMember, roundCurrency } from '../../utils/activity';
 import { useAppCurrency } from '../../context/CurrencyContext';
+import { styles } from './styles/External.styles';
 
 type RouteProps = RouteProp<RootStackParamList, 'SettleUp'>;
 type NavigationProps = NativeStackNavigationProp<RootStackParamList>;
@@ -668,13 +668,13 @@ export default function SettleUpScreen() {
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+        <View style={styles.headerN}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Icon name="chevron-left" size={26} color="#6a7282" />
           </TouchableOpacity>
 
           <View>
-            <Text style={styles.title}>Settle Up</Text>
+            <Text style={{...styles.title, marginTop: 12}}>Settle Up</Text>
             <Text style={styles.subtitle}>
               {expenseContext
                 ? 'Only the people involved in this expense'
@@ -774,7 +774,8 @@ export default function SettleUpScreen() {
             <View
               key={member.id}
               style={[
-                styles.memberCard,
+                styles.memberCard, { alignItems: 'center' },
+
                 member.isYouPaying
                   ? styles.owingCard
                   : styles.owedCard,
@@ -805,7 +806,7 @@ export default function SettleUpScreen() {
               <View style={styles.memberRight}>
                 <Text
                   style={[
-                    styles.memberAmount,
+                    styles.memberAmountS,
                     {
                       color: member.isYouPaying
                         ? '#ff2056'
@@ -848,7 +849,7 @@ export default function SettleUpScreen() {
                 : `Mark balance as received?`}
             </Text>
 
-            <View style={styles.modalButtons}>
+            <View style={styles.modalButtonsS}>
               <TouchableOpacity
                 disabled={isSubmitting}
                 onPress={() => setSelectedMember(null)}
@@ -871,215 +872,3 @@ export default function SettleUpScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-
-  header: {
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 12,
-  },
-
-  subtitle: {
-    fontSize: 14,
-    color: '#6a7282',
-  },
-
-  loadingWrap: {
-    paddingVertical: 24,
-  },
-
-  summaryCard: {
-    margin: 20,
-    borderRadius: 20,
-    padding: 24,
-  },
-
-  summaryLabel: { color: '#fff', opacity: 0.8 },
-  summaryAmount: {
-    color: '#fff',
-    fontSize: 36,
-    fontWeight: 'bold',
-    marginVertical: 6,
-  },
-  summarySub: { color: '#fff', opacity: 0.8 },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginHorizontal: 20,
-    marginBottom: 12,
-  },
-
-  expenseMetaCard: {
-    marginHorizontal: 20,
-    marginTop: 12,
-    padding: 18,
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-
-  expenseMetaTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-
-  expenseMetaSub: {
-    fontSize: 13,
-    color: '#6a7282',
-  },
-
-  participantsCard: {
-    marginHorizontal: 20,
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-
-  participantsTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-
-  participantRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f2f4f7',
-  },
-
-  participantName: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-
-  participantMeta: {
-    fontSize: 12,
-    color: '#98a2b3',
-  },
-
-  participantAmount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#101828',
-  },
-
-  emptyWrap: {
-    marginHorizontal: 20,
-    marginBottom: 12,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-
-  emptyText: {
-    color: '#6a7282',
-  },
-
-  memberCard: {
-    marginHorizontal: 20,
-    marginBottom: 12,
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  owingCard: {
-    backgroundColor: '#fff5f7',
-    borderWidth: 1,
-    borderColor: '#ffd9e0',
-  },
-
-  owedCard: {
-    backgroundColor: '#ecfdf5',
-    borderWidth: 1,
-    borderColor: '#d1fae5',
-  },
-
-  memberLeft: { flexDirection: 'row', alignItems: 'center' },
-
-  avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e5e7eb',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-
-  memberName: { fontSize: 16, fontWeight: '600' },
-  memberStatus: { fontSize: 12 },
-
-  memberAmount: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-
-  memberRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  settleButton: {
-    marginLeft: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-
-  settleText: { color: '#fff', fontSize: 14, fontWeight: '500' },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 20,
-  },
-
-  modalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 24,
-  },
-
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-  modalDesc: { fontSize: 14, marginBottom: 20 },
-  modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
-
-  cancelBtn: {
-    flex: 1,
-    padding: 12,
-    alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    marginRight: 10,
-  },
-
-  confirmBtn: {
-    flex: 1,
-    padding: 12,
-    alignItems: 'center',
-    backgroundColor: '#101828',
-    borderRadius: 12,
-  },
-});
