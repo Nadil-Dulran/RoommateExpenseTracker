@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { Notification } from '../../types/notification';
 import { useAppCurrency } from '../../context/CurrencyContext';
 import { useNotifications } from '../../context/NotificationContext';
+import { styles } from './styles/External.styles';
 
 const toImageUri = (value?: string | null, mimeType = 'image/jpeg') => {
   if (!value) {
@@ -74,7 +75,6 @@ const NotificationsScreen = () => {
       const parsed = Number(firstSplitAmount);
       return Number.isFinite(parsed) ? parsed : undefined;
     }
-
     return undefined;
   };
 
@@ -107,7 +107,7 @@ const NotificationsScreen = () => {
           <View style={styles.avatarContainer}>
             <Image
               source={avatarSource}
-              style={styles.avatar}
+              style={styles.avatarN}
             />
 
             <View
@@ -175,7 +175,7 @@ const NotificationsScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={styles.headerN}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Icon name="chevron-left" size={24} color="#6a7282" />
@@ -193,7 +193,7 @@ const NotificationsScreen = () => {
         <Text style={styles.title}>Notifications</Text>
 
         {unreadCount > 0 && (
-          <Text style={styles.subtitle}>
+          <Text style={{ ...styles.subtitle, marginTop: 4 }}>
             {unreadCount} unread notification
             {unreadCount > 1 ? 's' : ''}
           </Text>
@@ -206,7 +206,7 @@ const NotificationsScreen = () => {
         renderItem={renderItem}
         ListEmptyComponent={
           <View style={styles.centeredState}>
-            <Text style={styles.emptyText}>No unread notifications</Text>
+            <Text style={{ ...styles.emptyText, marginBottom: 6 }}>No unread notifications</Text>
           </View>
         }
         contentContainerStyle={{ padding: 16, flexGrow: 1 }}
@@ -214,151 +214,4 @@ const NotificationsScreen = () => {
     </View>
   );
 };
-
 export default NotificationsScreen;
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  header: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#101828',
-  },
-  subtitle: {
-    marginTop: 4,
-    fontSize: 14,
-    color: '#6A7282',
-  },
-  markAll: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#009966',
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
-  },
-  unreadCard: {
-    borderColor: '#009966',
-    backgroundColor: '#F9FFFE',
-  },
-  row: {
-    flexDirection: 'row',
-  },
-  avatarContainer: {
-    marginRight: 12,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-  },
-  badge: {
-    position: 'relative',
-    top: -13,
-    right: -28,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  message: {
-    fontSize: 13,
-    flex: 1,
-    marginRight: 6,
-  },
-  messageBlock: {
-    flex: 1,
-    marginRight: 6,
-  },
-  bold: {
-    fontWeight: '600',
-    color: '#101828',
-  },
-  light: {
-    color: '#6A7282',
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    backgroundColor: '#009966',
-    borderRadius: 4,
-    marginTop: 4,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  metaText: {
-    fontSize: 12,
-    color: '#6A7282',
-  },
-  dot: {
-    marginHorizontal: 6,
-    fontSize: 10,
-    color: '#99A1AF',
-  },
-  date: {
-    fontSize: 11,
-    color: '#99A1AF',
-  },
-  amountPill: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  settledPill: {
-    backgroundColor: '#ECFDF5',
-  },
-  categoryIcon: {
-    marginRight: 6,
-  },
-  amountText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#101828',
-  },
-  settledText: {
-    color: '#009966',
-  },
-  centeredState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6A7282',
-    marginBottom: 6,
-  },
-});
