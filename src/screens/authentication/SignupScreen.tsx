@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView,
-  Alert, Modal, Clipboard,
-} from 'react-native';
+Alert, Modal, Clipboard } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,7 +23,6 @@ export default function SignupScreen() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
   const [errors, setErrors] = useState<any>({});
   const [statusMessage, setStatusMessage] = useState('');
   const [statusType, setStatusType] = useState<'success' | 'error' | ''>('');
@@ -122,7 +120,7 @@ export default function SignupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.containerS}>
+    <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={[ styles.scroll, { flexGrow: 1, justifyContent: 'center' } ]} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={styles.header}>
@@ -136,7 +134,7 @@ export default function SignupScreen() {
         </View>
 
         {/* Card */}
-        <View style={styles.card}>
+        <View style={{...styles.card, marginBottom: 70}}>
 
           {/* Name */}
           <Text style={styles.label}>User Name </Text>

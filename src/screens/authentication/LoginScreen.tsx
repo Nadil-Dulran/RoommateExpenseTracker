@@ -115,7 +115,7 @@ const handleCopyEmail = async () => {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={{ flex: 1 }}>
-    <SafeAreaView style={styles.container} edges={['left', 'right', 'bottom']}>
+    <SafeAreaView style={{...styles.container, paddingHorizontal: 20}} edges={['left', 'right', 'bottom']}>
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
