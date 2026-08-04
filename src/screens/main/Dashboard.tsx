@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  ActivityIndicator,
-  ImageSourcePropType,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator,
+ImageSourcePropType } from 'react-native';
 import { CompositeNavigationProp, useFocusEffect } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -20,6 +18,7 @@ import { settlementService } from '../../services/settlementService';
 import { CATEGORY_EMOJI_BY_TYPE } from '../../constants/emojis';
 import { CategoryType, Settlement } from '../../types';
 import { extractSettlementsPayload, normalizeSettlement } from '../../utils/settlements';
+import { styles } from './styles/Main.styles';
 
 type DashboardUser = {
   id: string;
@@ -415,7 +414,7 @@ export default function DashboardScreen() {
   const unreadCount = notifications.filter(notification => !notification.read).length;
 
   return (
-    <View style={styles.container}>
+    <View style={{ ...styles.container, paddingHorizontal: 20 }}>
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#009966" />
@@ -425,7 +424,7 @@ export default function DashboardScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* Header */}
-        <View style={styles.header}>
+        <View style={styles.headerD}>
           <View>
             <Text style={styles.title}>Dashboard</Text>
             <Text style={styles.subtitle}>
@@ -449,7 +448,7 @@ export default function DashboardScreen() {
             <TouchableOpacity onPress={() => navigation.navigate('ProfileSettings')}>
               <Image
                 source={avatarSource}
-                style={styles.avatar}
+                style={styles.avatarD}
               />
             </TouchableOpacity>
           </View>
@@ -508,7 +507,7 @@ export default function DashboardScreen() {
           return (
             <TouchableOpacity
               key={group.id}
-              style={styles.groupCard}
+              style={styles.dashboardCard}
               onPress={() => navigation.navigate('GroupDetails', { id: group.id })}
             >
               <View style={styles.groupLeft}>
@@ -555,7 +554,7 @@ export default function DashboardScreen() {
           return (
             <TouchableOpacity
               key={expense.id}
-              style={styles.activityCard}
+              style={styles.dashboardCard}
               onPress={() => navigation.navigate('Activity')}
             >
               <View style={styles.groupLeft}>
@@ -595,277 +594,3 @@ export default function DashboardScreen() {
     </View>
   );
 }
-
-
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 20,
-  },
-
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2,
-  },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#101828',
-  },
-
-  subtitle: {
-    fontSize: 14,
-    color: '#6a7282',
-  },
-
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-
-  bellWrapper: {
-    position: 'relative',
-  },
-
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#ff2056',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderColor: '#F3F4F6',
-    borderWidth: 1,
-  },
-
-  balanceCard: {
-    backgroundColor: '#101828',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-
-  balanceHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-
-  balanceLabel: {
-    color: '#99A1AF',
-    fontSize: 14,
-  },
-
-  balanceAmount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginVertical: 10,
-    marginBottom: 10,
-  },
-
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-
-  subCard: {
-    flex: 0.48,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    minHeight: 70,
-  },
-
-  owedLabel: { color: '#009966', fontSize: 12 },
-  oweLabel: { color: '#ff2056', fontSize: 12 },
-
-  owedAmount: {
-    color: '#009966',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-
-  oweAmount: {
-    color: '#ff2056',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-
-  settleButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#ecfdf5',
-    borderColor: '#d0fae5',
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
-    marginBottom: 20,
-  },
-
-  settleText: {
-    color: '#007a55',
-    fontWeight: '500',
-  },
-
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#101828',
-  },
-
-  seeAll: {
-    color: '#009966',
-    fontWeight: '500',
-  },
-
-  groupCard: {
-    marginRight: 1,
-    marginLeft: 1,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    padding: 18,
-    marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    elevation: 2,
-  },
-
-  groupLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-
-  emojiBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  emoji: {
-    fontSize: 22,
-  },
-
-  groupName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#101828',
-  },
-
-  balanceType: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  groupAmount: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-
-  activityCard: {
-    marginRight: 1,
-    marginLeft: 1,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    elevation: 2,
-  },
-
-  iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: '#f3f4f6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  icon: {
-    fontSize: 20,
-  },
-
-  activitySub: {
-    fontSize: 12,
-    color: '#99A1AF',
-  },
-
-  activityAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#101828',
-  },
-
-  errorCard: {
-    marginTop: 16,
-    marginBottom: 8,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-
-  errorText: {
-    color: '#B91C1C',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-});
