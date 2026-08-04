@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, Alert } from 'react-native';
+import { View, Text, FlatList, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,6 +15,7 @@ import { normalizeExpense, sortRawExpensesByLatest } from '../../utils/expenses'
 import DeleteExpenseModal from '../../components/expenses/DeleteExpenseModal';
 import EditExpenseModal from '../../components/expenses/EditExpenseModal';
 import ExpenseCard from '../../components/expenses/ExpenseCard';
+import { styles } from './styles/Main.styles';
 
 type SplitMode = 'equal' | 'exact' | 'percentage';
 
@@ -707,8 +708,8 @@ const loadExpenses = useCallback(async () => {
   };
 
   return (
-    <View style={styles.container}>
-       <Text style={styles.header}>All Expenses</Text>
+    <View style={{...styles.container, paddingHorizontal: 18, paddingTop: 20}}>
+       <Text style={styles.headerE}>All Expenses</Text>
       <Text style={styles.subHeader}>
         {visibleExpenses.length} total
       </Text>
@@ -762,30 +763,3 @@ const loadExpenses = useCallback(async () => {
 
 </View>
 )};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: 18,
-    paddingTop: 20,
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#101828',
-  },
-  subHeader: {
-    fontSize: 14,
-    color: '#6A7282',
-    marginBottom: 20,
-  },
-  expenseListContainer: {
-    flex: 1,
-  },
-  expenseListContent: {
-    paddingHorizontal: 2,
-    paddingTop: 2,
-    paddingBottom: 100,
-  },
-});
