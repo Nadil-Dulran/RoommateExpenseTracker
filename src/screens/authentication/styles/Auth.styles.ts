@@ -9,7 +9,6 @@ export const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-    paddingHorizontal: 20,
   },
   content: {
     flex: 1,
@@ -70,7 +69,7 @@ export const styles = StyleSheet.create({
   input: {
     flex: 1,
     marginLeft: 8,
-    fontSize: 12,
+    fontSize: 13,
     color: '#101828',
   },
   error: {
@@ -257,7 +256,6 @@ export const styles = StyleSheet.create({
    * Signup Styles
    */
 
-  containerS: { flex: 1, backgroundColor: '#F9FAFB' },
   scroll: { padding: 24, flexGrow: 1, justifyContent: 'center'},
   errorBorder: { borderColor: '#ff2056' },
 
@@ -296,7 +294,7 @@ export const styles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
   },
   primaryButtonText: { color: '#fff', fontWeight: '600' },
   statusMessage: {
@@ -398,10 +396,6 @@ export const styles = StyleSheet.create({
    * Forgot Password Styles
    */
 
-  pageContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
   subtitleF: {
     fontSize: 14,
     color: '#6a7282',
