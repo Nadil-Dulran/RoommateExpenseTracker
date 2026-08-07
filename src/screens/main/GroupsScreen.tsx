@@ -1,12 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -27,6 +20,7 @@ import { useAppCurrency } from '../../context/CurrencyContext';
 import { Settlement } from '../../types';
 import { emojis } from '../../constants/emojis';
 import GroupModal from '../../components/groups/GroupModal';
+import { styles } from './styles/Main.styles';
 
 type GroupsNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<BottomTabParamList, 'Groups'>,
@@ -367,7 +361,6 @@ export default function GroupsScreen() {
         await Promise.all([loadExpenses(), loadCurrentUserId(), loadSettlements()]);
 
         const joinResult = await consumeJoinGroupResult();
-
         if (!isActive || !joinResult) {
           return;
         }
@@ -502,10 +495,10 @@ export default function GroupsScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
 
         {/* Header */}
-        <View style={styles.header}>
+        <View style={styles.headerG}>
           <View>
             <Text style={styles.title}>Your Groups</Text>
-            <Text style={styles.subtitle}>
+            <Text style={styles.subtitleG}>
               Manage your expense groups
             </Text>
           </View>
@@ -534,14 +527,14 @@ export default function GroupsScreen() {
           return (
             <TouchableOpacity
               key={group.id}
-              style={styles.groupCard}
+              style={styles.groupCardG}
               onPress={() =>
                 navigation.navigate('GroupDetails', { id: String(group.id), group })
               }
             >
       {/* Top Section */}
       <View style={styles.groupTop}>
-        <View style={styles.emojiBox}>
+        <View style={styles.emojiBoxG}>
           <Text style={styles.emoji}>{group.emoji}</Text>
         </View>
 
@@ -554,7 +547,7 @@ export default function GroupsScreen() {
                   key={member.id}
                   source={getAvatarSource(member.avatar)}
                   style={[
-                    styles.avatar,
+                    styles.avatarG,
                     { marginLeft: index === 0 ? 0 : -10 },
                   ]}
                 />
@@ -571,7 +564,7 @@ export default function GroupsScreen() {
               <View style={styles.divider} />
 
               {/* Balance Section */}
-              <View style={styles.balanceRow}>
+              <View style={styles.balanceRowG}>
                 <Text style={styles.balanceLabel}>
                   Your balance
                 </Text>
@@ -597,7 +590,7 @@ export default function GroupsScreen() {
                   {amount !== 0 && (
                     <Text
                       style={[
-                        styles.balanceAmount,
+                        styles.balanceAmountG,
                         { color: isOwing ? '#ff2056' : '#009966' },
                       ]}
                     >
@@ -625,7 +618,7 @@ export default function GroupsScreen() {
        onClose={() => setShowCreate(false)}
        onConfirm={handleCreateGroup}
      >
-      <Text style={[styles.label, { marginTop: 20 }]}>
+      <Text style={[styles.labelG, { marginTop: 20 }]}>
        Choose an Emoji
       </Text>
 
@@ -668,183 +661,3 @@ export default function GroupsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-
-  header: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#101828',
-  },
-
-  subtitle: {
-    fontSize: 14,
-    color: '#6A7282',
-    marginTop: 4,
-  },
-
-  joinHeaderButton: {
-    marginTop: 12,
-    backgroundColor: '#009966',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 8,
-  },
-
-  joinHeaderButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-
-  addButton: {
-    backgroundColor: '#009966',
-    padding: 10,
-    borderRadius: 20,
-    bottom: 5,
-    top: 3,
-  },
-
-  groupCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 20,
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-
-  groupTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  emojiBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-
-  emoji: {
-    fontSize: 24,
-  },
-
-  groupName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#101828',
-  },
-
-  memberText: {
-    fontSize: 12,
-    color: '#6A7282',
-    marginTop: 4,
-  },
-
-  divider: {
-    height: 1,
-    backgroundColor: '#F3F4F6',
-    marginVertical: 14,
-  },
-
-  balanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  balanceLabel: {
-    fontSize: 14,
-    color: '#6A7282',
-  },
-
-  balanceType: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-
-  balanceAmount: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-
-  settledText: {
-    fontSize: 14,
-    color: '#009966',
-    fontWeight: '600',
-  },
-
-emojiGrid: {
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  justifyContent: 'space-between',
-},
-
-emojiItem: {
-  width: 40,
-  height: 40,
-  borderRadius: 16,
-  borderWidth: 2,
-  borderColor: '#E5E7EB',
-  justifyContent: 'center',
-  alignItems: 'center',
-  marginBottom: 12,
-},
-
-selectedEmoji: {
-  borderColor: '#009966',
-  backgroundColor: '#ECFDF5',
-},
-
-label: {
-  fontSize: 13,
-  fontWeight: '600',
-  color: '#6A7282',
-  marginBottom: 8,
-},
-
-memberRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginTop: 6,
-},
-
-avatarStack: {
-  flexDirection: 'row',
-  marginRight: 8,
-},
-
-avatar: {
-  width: 22,
-  height: 22,
-  borderRadius: 11,
-  borderWidth: 2,
-  borderColor: '#fff',
-},
-
-});

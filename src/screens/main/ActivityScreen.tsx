@@ -21,6 +21,7 @@ import { FilterOption, BackendGroup, TimelineEntry } from '../../types/activity'
 import GroupActivityCard from '../../components/activity/GroupActivityCard';
 import SettlementActivityCard from '../../components/activity/SettlementActivityCard';
 import ExpenseActivityCard from '../../components/activity/ExpenseActivityCard';
+import { styles } from './styles/Main.styles';
 
 type NavigationProps = NativeStackNavigationProp<RootStackParamList>;
 
@@ -413,7 +414,7 @@ export default function ActivityScreen() {
         }
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Activity</Text>
+          <Text style={{...styles.title, marginBottom: 10}}>Activity</Text>
 
           <View style={styles.filterRow}>
             {(['all', 'week', 'month'] as const).map(type => (
@@ -453,65 +454,3 @@ export default function ActivityScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-  },
-  header: {
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#101828',
-    marginBottom: 10,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  filterButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
-    marginTop: 6,
-  },
-  filterActive: {
-    backgroundColor: '#009966',
-  },
-  filterText: {
-    fontSize: 14,
-    color: '#6a7282',
-    fontWeight: '600',
-  },
-  filterTextActive: {
-    color: '#fff',
-  },
-  dateHeader: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6a7282',
-    marginBottom: 10,
-  },
-  contentWrap: {
-    padding: 16,
-  },
-  daySection: {
-    marginBottom: 24,
-  },
-  emptyWrap: {
-    paddingVertical: 32,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#6a7282',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-});
